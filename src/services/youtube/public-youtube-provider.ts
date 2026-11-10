@@ -5,12 +5,14 @@ import {
 import {
   YouTubeVideo,
   YouTubeChannel,
-  YouTubeComment,
   YouTubePlaylistMeta,
   YouTubeFeedResponse,
   YouTubeSearchResponse,
 } from "./types";
 import { formatDuration, formatViewCount } from "@/lib/utils";
+import { Ytdl } from "@distube/ytdl-core";
+
+const ytdl = new Ytdl();
 
 // Category query mappings for real YouTube content discovery
 const CATEGORY_SEARCH_QUERIES: Record<string, string> = {
@@ -223,7 +225,6 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
               " views",
               ""
             ),
-            commentCount: Math.round(viewCount * 0.005),
           });
         }
 
@@ -368,11 +369,123 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
   }
 
   /**
-   * Get video details using YouTube oEmbed and InnerTube search
+   * Get authentic video details and full description using Ytdl, watch page HTML, and InnerTube
    */
   async getVideoDetails(videoId: string): Promise<YouTubeVideo | null> {
+    // 1. Primary: Ytdl metadata extraction (retrieves authentic full description, channel metadata, view counts)
     try {
-      // 1. Fetch oEmbed metadata for accurate title and author
+      const info = await ytdl.getInfo(videoId);
+      const vd = info.videoDetails as any;
+      const duration = parseInt(String(vd.lengthSeconds || "0"), 10);
+      const viewCount = parseInt(String(vd.viewCount || "0"), 10);
+      const likeCount = vd.likes ? parseInt(String(vd.likes), 10) : undefined;
+
+      return {
+        id: videoId,
+        title: vd.title || "YouTube Video",
+        description: vd.description || "",
+        publishedAt: vd.publishDate || vd.uploadDate || "Recently",
+        channelId: vd.author?.id || vd.channelId || "",
+        channelTitle: vd.author?.name || "Creator",
+        channelThumbnailUrl: vd.author?.thumbnails?.[0]?.url,
+        thumbnails: {
+          default: { url: `https://i.ytimg.com/vi/${videoId}/default.jpg`, width: 120, height: 90 },
+          medium: { url: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`, width: 320, height: 180 },
+          high: { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480, height: 360 },
+          maxres: { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280, height: 720 },
+        },
+        duration,
+        durationFormatted: formatDuration(duration),
+        viewCount,
+        viewCountFormatted: formatViewCount(viewCount),
+        likeCount,
+        likeCountFormatted: likeCount
+          ? formatViewCount(likeCount).replace(" views", "")
+          : undefined,
+        isLive: !!vd.isLiveContent,
+        tags: vd.keywords ? [...vd.keywords] : [],
+      };
+    } catch (ytdlErr: any) {
+      console.warn(`ytdl.getInfo failed for ${videoId}:`, ytdlErr.message);
+    }
+
+    // 2. Secondary: Direct watch page HTML extraction for shortDescription
+    try {
+      const watchRes = await fetch(
+        `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          signal: AbortSignal.timeout(5000),
+        }
+      );
+
+      if (watchRes.ok) {
+        const html = await watchRes.text();
+        const descMatch = html.match(/"shortDescription":\s*"((?:\\.|[^"\\])*)"/);
+        const titleTagMatch = html.match(/<title>([^<]+)<\/title>/);
+        const authorMatch = html.match(/"author":\s*"((?:\\.|[^"\\])*)"/);
+        const channelIdMatch = html.match(/"channelId":\s*"((?:\\.|[^"\\])*)"/);
+        const lengthMatch = html.match(/"lengthSeconds":\s*"(\d+)"/);
+        const viewCountMatch = html.match(/"viewCount":\s*"(\d+)"/);
+
+        if (descMatch || titleTagMatch) {
+          const title = titleTagMatch
+            ? titleTagMatch[1].replace(/ - YouTube$/, "").trim()
+            : "YouTube Video";
+          let description = "";
+          if (descMatch) {
+            try {
+              description = JSON.parse(`"${descMatch[1]}"`);
+            } catch {
+              description = descMatch[1];
+            }
+          }
+          let channelTitle = "Creator";
+          if (authorMatch) {
+            try {
+              channelTitle = JSON.parse(`"${authorMatch[1]}"`);
+            } catch {}
+          }
+          let channelId = "";
+          if (channelIdMatch) {
+            try {
+              channelId = JSON.parse(`"${channelIdMatch[1]}"`);
+            } catch {}
+          }
+
+          const duration = lengthMatch ? parseInt(lengthMatch[1], 10) : 0;
+          const viewCount = viewCountMatch ? parseInt(viewCountMatch[1], 10) : 0;
+
+          return {
+            id: videoId,
+            title,
+            description,
+            publishedAt: "Recently",
+            channelId,
+            channelTitle,
+            thumbnails: {
+              default: { url: `https://i.ytimg.com/vi/${videoId}/default.jpg`, width: 120, height: 90 },
+              medium: { url: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`, width: 320, height: 180 },
+              high: { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480, height: 360 },
+              maxres: { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280, height: 720 },
+            },
+            duration,
+            durationFormatted: formatDuration(duration),
+            viewCount,
+            viewCountFormatted: formatViewCount(viewCount),
+          };
+        }
+      }
+    } catch (htmlErr: any) {
+      console.warn(`Watch page HTML fetch failed for ${videoId}:`, htmlErr.message);
+    }
+
+    // 3. Tertiary fallback: oEmbed + InnerTube search
+    try {
       const oembedRes = await fetch(
         `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${encodeURIComponent(
           videoId
@@ -389,7 +502,6 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
         channelTitle = oembedData.author_name || channelTitle;
       }
 
-      // 2. Query InnerTube search for this video ID to get duration, views, etc.
       const searchData = await this.queryInnerTubeSearch(videoId);
       const matchedVideos = this.extractVideosFromTree(searchData);
       const matched = matchedVideos.find((v) => v.id === videoId);
@@ -402,35 +514,18 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
         };
       }
 
-      // Fallback constructed video object with oEmbed info
       return {
         id: videoId,
         title,
-        description: `Watch ${title} on YouTube Web Client.`,
+        description: "",
         publishedAt: "Recently",
         channelId,
         channelTitle,
         thumbnails: {
-          default: {
-            url: `https://i.ytimg.com/vi/${videoId}/default.jpg`,
-            width: 120,
-            height: 90,
-          },
-          medium: {
-            url: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-            width: 320,
-            height: 180,
-          },
-          high: {
-            url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-            width: 480,
-            height: 360,
-          },
-          maxres: {
-            url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-            width: 1280,
-            height: 720,
-          },
+          default: { url: `https://i.ytimg.com/vi/${videoId}/default.jpg`, width: 120, height: 90 },
+          medium: { url: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`, width: 320, height: 180 },
+          high: { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480, height: 360 },
+          maxres: { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280, height: 720 },
         },
         duration: 300,
         durationFormatted: "5:00",
@@ -438,10 +533,9 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
         viewCountFormatted: "100K views",
         likeCount: 5000,
         likeCountFormatted: "5K",
-        commentCount: 250,
       };
     } catch (err: any) {
-      console.warn("PublicYouTubeDataProvider.getVideoDetails error:", err.message);
+      console.warn("PublicYouTubeDataProvider.getVideoDetails fallback error:", err.message);
       return null;
     }
   }
@@ -579,7 +673,6 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
                 " views",
                 ""
               ),
-              commentCount: Math.round(viewCount * 0.005),
             });
           }
         }
@@ -653,7 +746,6 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
               " views",
               ""
             ),
-            commentCount: Math.round(viewCount * 0.005),
           });
         }
 
@@ -850,239 +942,6 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
     } catch (err: any) {
       console.warn("getChannelVideos error:", err.message);
       return { videos: [] };
-    }
-  }
-
-  /**
-   * Helper to query InnerTube Next endpoint (comments, related items)
-   */
-  private async queryInnerTubeNext(body: Record<string, any>) {
-    const payload = {
-      context: {
-        client: {
-          clientName: "WEB",
-          clientVersion: "2.20240410.01.00",
-          hl: "en",
-          gl: "US",
-          utcOffsetMinutes: 0,
-        },
-      },
-      ...body,
-    };
-
-    const res = await fetch(
-      "https://www.youtube.com/youtubei/v1/next?prettyPrint=false",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    if (!res.ok) {
-      throw new Error(`InnerTube next failed with HTTP ${res.status}`);
-    }
-
-    return await res.json();
-  }
-
-  /**
-   * Get real video comments with full pagination and modern entity extraction
-   */
-  async getVideoComments(
-    videoId: string,
-    pageToken?: string
-  ): Promise<{
-    comments: YouTubeComment[];
-    nextPageToken?: string;
-    commentsDisabled?: boolean;
-  }> {
-    try {
-      let continuationToken = pageToken;
-
-      // If no pageToken provided, fetch /next for videoId to resolve initial comments token
-      if (!continuationToken) {
-        const nextData = await this.queryInnerTubeNext({ videoId });
-
-        let isDisabled = false;
-        const findCommentsSection = (curr: any) => {
-          if (!curr || typeof curr !== "object") return;
-          if (curr.commentsDisabledRenderer) {
-            isDisabled = true;
-            return;
-          }
-          if (curr.itemSectionRenderer?.targetId === "comments-section") {
-            const continuation = curr.itemSectionRenderer.contents?.find(
-              (c: any) => c.continuationItemRenderer
-            );
-            if (
-              continuation?.continuationItemRenderer?.continuationEndpoint
-                ?.continuationCommand?.token
-            ) {
-              continuationToken =
-                continuation.continuationItemRenderer.continuationEndpoint
-                  .continuationCommand.token;
-              return;
-            }
-          }
-          for (const k of Object.keys(curr)) {
-            if (!continuationToken && !isDisabled) findCommentsSection(curr[k]);
-          }
-        };
-
-        findCommentsSection(nextData);
-
-        if (isDisabled) {
-          return { comments: [], commentsDisabled: true };
-        }
-      }
-
-      if (!continuationToken) {
-        return { comments: [] };
-      }
-
-      const data = await this.queryInnerTubeNext({
-        continuation: continuationToken,
-      });
-
-      const comments: YouTubeComment[] = [];
-      const seenIds = new Set<string>();
-      let nextPageToken: string | undefined = undefined;
-
-      // 1. Extract from frameworkUpdates mutations (modern YouTube format)
-      const mutations =
-        data.frameworkUpdates?.entityBatchUpdate?.mutations || [];
-      for (const m of mutations) {
-        const cep = m.payload?.commentEntityPayload;
-        if (
-          cep &&
-          cep.properties?.commentId &&
-          !seenIds.has(cep.properties.commentId)
-        ) {
-          seenIds.add(cep.properties.commentId);
-          const rawLikes =
-            cep.toolbar?.likeCountNotliked || cep.toolbar?.likeCountLiked || "0";
-          const rawReplies = cep.toolbar?.replyCount || "0";
-          comments.push({
-            id: cep.properties.commentId,
-            authorDisplayName: cep.author?.displayName || "Viewer",
-            authorProfileImageUrl:
-              cep.author?.avatarThumbnailUrl ||
-              "https://yt3.ggpht.com/default=s88-c-k-c0x00ffffff-no-rj",
-            textDisplay: cep.properties?.content?.content || "",
-            likeCount: this.parseViewCount(rawLikes),
-            publishedAt: cep.properties?.publishedTime || "Recently",
-            replyCount: parseInt(rawReplies.replace(/[^0-9]/g, ""), 10) || 0,
-          });
-        }
-      }
-
-      // 2. Fallback to traditional walk & extract next page continuation
-      const walk = (curr: any) => {
-        if (!curr || typeof curr !== "object") return;
-
-        const cr = curr.commentRenderer;
-        if (cr && cr.commentId && !seenIds.has(cr.commentId)) {
-          seenIds.add(cr.commentId);
-          const text =
-            cr.contentText?.runs?.map((r: any) => r.text).join("") ||
-            cr.contentText?.simpleText ||
-            "";
-          comments.push({
-            id: cr.commentId,
-            authorDisplayName:
-              cr.authorText?.simpleText ||
-              cr.authorText?.runs?.[0]?.text ||
-              "Viewer",
-            authorProfileImageUrl:
-              cr.authorThumbnail?.thumbnails?.[0]?.url ||
-              "https://yt3.ggpht.com/default=s88-c-k-c0x00ffffff-no-rj",
-            textDisplay: text,
-            likeCount: cr.likeCount || 0,
-            publishedAt:
-              cr.publishedTimeText?.runs?.[0]?.text ||
-              cr.publishedTimeText?.simpleText ||
-              "Recently",
-            replyCount: cr.replyCount || 0,
-          });
-        }
-
-        // Pagination continuation token
-        if (
-          curr.continuationItemRenderer?.continuationEndpoint
-            ?.continuationCommand?.token
-        ) {
-          const token =
-            curr.continuationItemRenderer.continuationEndpoint
-              .continuationCommand.token;
-          if (
-            !curr.trigger ||
-            curr.trigger !== "CONTINUATION_TRIGGER_ON_ITEM_SHOWN"
-          ) {
-            nextPageToken = token;
-          }
-        }
-
-        for (const k of Object.keys(curr)) {
-          walk(curr[k]);
-        }
-      };
-
-      walk(data);
-
-      return {
-        comments,
-        nextPageToken,
-      };
-    } catch (err: any) {
-      console.warn("getVideoComments error:", err.message);
-      return { comments: [] };
-    }
-  }
-
-  /**
-   * Fetch replies for a comment thread
-   */
-  async getCommentReplies(
-    replyToken: string
-  ): Promise<{ replies: YouTubeComment[] }> {
-    try {
-      const data = await this.queryInnerTubeNext({
-        continuation: replyToken,
-      });
-
-      const replies: YouTubeComment[] = [];
-      const seenIds = new Set<string>();
-
-      const mutations =
-        data.frameworkUpdates?.entityBatchUpdate?.mutations || [];
-      for (const m of mutations) {
-        const cep = m.payload?.commentEntityPayload;
-        if (
-          cep &&
-          cep.properties?.commentId &&
-          !seenIds.has(cep.properties.commentId)
-        ) {
-          seenIds.add(cep.properties.commentId);
-          replies.push({
-            id: cep.properties.commentId,
-            authorDisplayName: cep.author?.displayName || "Viewer",
-            authorProfileImageUrl:
-              cep.author?.avatarThumbnailUrl ||
-              "https://yt3.ggpht.com/default=s88-c-k-c0x00ffffff-no-rj",
-            textDisplay: cep.properties?.content?.content || "",
-            likeCount: this.parseViewCount(
-              cep.toolbar?.likeCountNotliked || "0"
-            ),
-            publishedAt: cep.properties?.publishedTime || "Recently",
-          });
-        }
-      }
-
-      return { replies };
-    } catch (err: any) {
-      console.warn("getCommentReplies error:", err.message);
-      return { replies: [] };
     }
   }
 

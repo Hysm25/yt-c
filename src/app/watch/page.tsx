@@ -13,7 +13,6 @@ import {
 import { YouTubeVideo, YouTubeChannel } from "@/services/youtube/types";
 import { VideoPlayer } from "@/components/player/video-player";
 import { VideoInfo } from "@/components/video/video-info";
-import { CommentSection } from "@/components/comments/comment-section";
 import { VideoCard } from "@/components/video/video-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -153,7 +152,7 @@ function WatchPageContent() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto p-0 sm:p-4">
-      {/* Main Watch Column: Video Player, Video Metadata, Comments */}
+      {/* Main Watch Column: Video Player, Video Metadata */}
       <div className="lg:col-span-2 flex flex-col gap-4 px-2 sm:px-0">
         {/* Player Container */}
         <VideoPlayer
@@ -168,12 +167,6 @@ function WatchPageContent() {
 
         {/* Video Info: Title, Actions, Channel, Description */}
         {video && <VideoInfo video={video} channel={channel} />}
-
-        {/* Comments Section */}
-        <CommentSection
-          videoId={videoId}
-          initialCommentsCount={video?.commentCount || 0}
-        />
       </div>
 
       {/* Right Column: Playlist Queue (if active) & Related Videos */}

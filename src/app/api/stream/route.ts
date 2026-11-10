@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
+import { Ytdl } from "@distube/ytdl-core";
 import { signProxyUrl } from "@/lib/stream-crypto";
+import { apiCache } from "@/services/youtube/cache";
 
-// Verified open-source media fixtures for reliable native HTML5 playback testing
+const ytdl = new Ytdl();
+
+// Open-source media fixtures for local offline development / unit tests
 const OPEN_TEST_STREAMS: Record<string, string> = {
   L_LUpnjgPso:
     "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4",
-  jNQXAC9IVRw:
-    "https://www.w3schools.com/html/mov_bbb.mp4",
-  dQw4w9WgXcQ:
-    "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
   fJ9rUzIMcZQ:
     "https://archive.org/download/ElephantsDream/ed_1024_512kb.mp4",
   "9bZkp7q19f0":
@@ -18,13 +18,12 @@ const OPEN_TEST_STREAMS: Record<string, string> = {
 };
 
 /**
- * Dynamic stream extractor using YouTube InnerTube Player API
+ * Secondary stream extractor fallback using InnerTube Android VR client
  */
-async function extractProgressiveStream(videoId: string): Promise<{
+async function extractProgressiveStreamFallback(videoId: string): Promise<{
   url: string;
   itag: number;
   qualityLabel?: string;
-  quality?: string;
 } | null> {
   try {
     const res = await fetch("https://www.youtube.com/youtubei/v1/player", {
@@ -52,12 +51,8 @@ async function extractProgressiveStream(videoId: string): Promise<{
 
     const data = await res.json();
     const formats = data.streamingData?.formats;
+    if (!Array.isArray(formats) || formats.length === 0) return null;
 
-    if (!Array.isArray(formats) || formats.length === 0) {
-      return null;
-    }
-
-    // Look for a progressive stream with direct URL and no cipher
     const directFormat = formats.find(
       (f: any) =>
         f.url &&
@@ -71,13 +66,11 @@ async function extractProgressiveStream(videoId: string): Promise<{
         url: directFormat.url,
         itag: directFormat.itag,
         qualityLabel: directFormat.qualityLabel,
-        quality: directFormat.quality,
       };
     }
-
     return null;
   } catch (err: any) {
-    console.warn(`Stream extraction failed for ${videoId}:`, err.message);
+    console.warn(`Fallback stream extraction failed for ${videoId}:`, err.message);
     return null;
   }
 }
@@ -96,6 +89,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         success: true,
         streamUrl: directUrl,
+        audioUrl: null,
         format: "mp4",
         quality: "original",
         hasDirectStream: true,
@@ -119,33 +113,119 @@ export async function GET(request: Request) {
       return NextResponse.json({
         success: true,
         streamUrl: videoId,
+        audioUrl: null,
         format: videoId.endsWith(".webm") ? "webm" : "mp4",
         quality: "direct",
         hasDirectStream: true,
       });
     }
 
-    // 3. Attempt dynamic progressive stream extraction from YouTube
-    const extracted = await extractProgressiveStream(videoId);
-    if (extracted && extracted.url) {
-      const signedProxyUrl = signProxyUrl(extracted.url, 7200);
-      return NextResponse.json({
-        success: true,
-        streamUrl: signedProxyUrl,
-        format: "mp4",
-        quality: extracted.qualityLabel || extracted.quality || "360p",
-        itag: extracted.itag,
-        hasDirectStream: true,
-        isProxied: true,
-      });
+    // Check memory cache
+    const cacheKey = `stream:${videoId}`;
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
     }
 
-    // 4. Open-source media fixture fallback for verified test assets
+    // 3. Primary extraction via Ytdl (deciphers signature and n-parameter for cipher-protected videos)
+    try {
+      const info = await ytdl.getInfo(videoId);
+
+      // Check for progressive format with both audio and video
+      const muxedFormats = info.formats.filter(
+        (f) => f.hasVideo && f.hasAudio && f.container === "mp4" && f.url
+      );
+
+      if (muxedFormats.length > 0) {
+        muxedFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
+        const best = muxedFormats[0];
+        if (best.url) {
+          const signedProxyUrl = signProxyUrl(best.url, 7200);
+
+          const responsePayload = {
+            success: true,
+            hasDirectStream: true,
+            streamUrl: signedProxyUrl,
+            audioUrl: null,
+            quality: best.qualityLabel || `${best.height}p` || "720p",
+            itag: best.itag,
+            format: "mp4",
+            isProxied: true,
+          };
+
+          apiCache.set(cacheKey, responsePayload, 1800);
+          return NextResponse.json(responsePayload);
+        }
+      }
+
+      // Check for adaptive formats (separate video and audio streams)
+      const videoFormats = info.formats.filter(
+        (f) => f.hasVideo && f.container === "mp4" && f.url
+      );
+      videoFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
+      // Prioritize <= 1080p for stable browser HTML5 hardware decoding
+      const bestVideo =
+        videoFormats.find((f) => (f.height || 0) <= 1080) || videoFormats[0];
+
+      const audioFormats = info.formats.filter(
+        (f) =>
+          !f.hasVideo &&
+          f.hasAudio &&
+          (f.container === "mp4" || f.container === "m4a") &&
+          f.url
+      );
+      audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
+      const bestAudio = audioFormats[0];
+
+      if (bestVideo && bestAudio && bestVideo.url && bestAudio.url) {
+        const signedVideoUrl = signProxyUrl(bestVideo.url, 7200);
+        const signedAudioUrl = signProxyUrl(bestAudio.url, 7200);
+
+        const responsePayload = {
+          success: true,
+          hasDirectStream: true,
+          streamUrl: signedVideoUrl,
+          audioUrl: signedAudioUrl,
+          quality: bestVideo.qualityLabel || `${bestVideo.height}p` || "1080p",
+          itag: bestVideo.itag,
+          audioItag: bestAudio.itag,
+          format: "mp4",
+          isProxied: true,
+        };
+
+        apiCache.set(cacheKey, responsePayload, 1800);
+        return NextResponse.json(responsePayload);
+      }
+    } catch (ytdlErr: any) {
+      console.warn(`ytdl extraction failed for ${videoId}:`, ytdlErr.message);
+    }
+
+    // 4. Secondary fallback via InnerTube Android VR client
+    const fallbackExtracted = await extractProgressiveStreamFallback(videoId);
+    if (fallbackExtracted && fallbackExtracted.url) {
+      const signedProxyUrl = signProxyUrl(fallbackExtracted.url, 7200);
+      const responsePayload = {
+        success: true,
+        hasDirectStream: true,
+        streamUrl: signedProxyUrl,
+        audioUrl: null,
+        quality: fallbackExtracted.qualityLabel || "360p",
+        itag: fallbackExtracted.itag,
+        format: "mp4",
+        isProxied: true,
+      };
+
+      apiCache.set(cacheKey, responsePayload, 1800);
+      return NextResponse.json(responsePayload);
+    }
+
+    // 5. Open-source media fixture fallback for test assets
     const openFixture = OPEN_TEST_STREAMS[videoId];
     if (openFixture) {
       return NextResponse.json({
         success: true,
         streamUrl: openFixture,
+        audioUrl: null,
         format: "mp4",
         quality: "720p",
         hasDirectStream: true,
@@ -153,13 +233,13 @@ export async function GET(request: Request) {
       });
     }
 
-    // 5. Video is restricted by YouTube signature cipher or Botguard verification
+    // 6. Video genuinely unavailable or restricted by DRM/region locks
     return NextResponse.json({
       success: true,
       hasDirectStream: false,
       recommendedProvider: "embed",
       message:
-        "Direct progressive stream is unavailable for this video due to YouTube cipher protection. The Official YouTube Player fallback is recommended for 100% playback fidelity.",
+        "Direct stream is unavailable for this video. Use the official player fallback for playback.",
     });
   } catch (error: any) {
     console.error("GET /api/stream error:", error);

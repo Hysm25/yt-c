@@ -5,7 +5,6 @@ import {
 import {
   YouTubeVideo,
   YouTubeChannel,
-  YouTubeComment,
   YouTubePlaylistMeta,
   YouTubeFeedResponse,
   YouTubeSearchResponse,
@@ -33,7 +32,6 @@ export const MOCK_VIDEOS: YouTubeVideo[] = [
     viewCountFormatted: "1.5B views",
     likeCount: 16000000,
     likeCountFormatted: "16M",
-    commentCount: 2300000,
     tags: ["Rick Astley", "Music", "80s Pop", "Never Gonna Give You Up"],
   },
   {
@@ -56,7 +54,6 @@ export const MOCK_VIDEOS: YouTubeVideo[] = [
     viewCountFormatted: "312M views",
     likeCount: 15000000,
     likeCountFormatted: "15M",
-    commentCount: 11000000,
     tags: ["Jawed Karim", "First YouTube Video", "Zoo", "History"],
   },
   {
@@ -79,7 +76,6 @@ export const MOCK_VIDEOS: YouTubeVideo[] = [
     viewCountFormatted: "12M views",
     likeCount: 78000,
     likeCountFormatted: "78K",
-    commentCount: 4200,
     tags: ["Blender", "3D Animation", "Open Source", "Big Buck Bunny", "4K 60fps"],
   },
   {
@@ -102,7 +98,6 @@ export const MOCK_VIDEOS: YouTubeVideo[] = [
     viewCountFormatted: "1.7B views",
     likeCount: 12000000,
     likeCountFormatted: "12M",
-    commentCount: 940000,
     tags: ["Queen", "Bohemian Rhapsody", "Rock", "Freddie Mercury"],
   },
   {
@@ -125,7 +120,6 @@ export const MOCK_VIDEOS: YouTubeVideo[] = [
     viewCountFormatted: "5.2B views",
     likeCount: 28000000,
     likeCountFormatted: "28M",
-    commentCount: 5400000,
     tags: ["PSY", "Gangnam Style", "K-Pop", "Dance"],
   },
   {
@@ -148,7 +142,6 @@ export const MOCK_VIDEOS: YouTubeVideo[] = [
     viewCountFormatted: "8.4B views",
     likeCount: 53000000,
     likeCountFormatted: "53M",
-    commentCount: 4300000,
     tags: ["Luis Fonsi", "Daddy Yankee", "Despacito", "Latin Pop"],
   },
 ];
@@ -191,36 +184,6 @@ export const MOCK_CHANNELS: Record<string, YouTubeChannel> = {
     viewCount: 140000000,
   },
 };
-
-export const MOCK_COMMENTS: YouTubeComment[] = [
-  {
-    id: "c1",
-    authorDisplayName: "Digital Nomad",
-    authorProfileImageUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100",
-    textDisplay: "This masterpiece will literally never get old. The production and arrangement are unmatched!",
-    likeCount: 28420,
-    publishedAt: "2024-01-15T12:30:00Z",
-    replyCount: 12,
-  },
-  {
-    id: "c2",
-    authorDisplayName: "Retro Music Enthusiast",
-    authorProfileImageUrl: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100",
-    textDisplay: "Who else is listening to this in 2026? A true legend of our time.",
-    likeCount: 14210,
-    publishedAt: "2024-03-20T18:15:00Z",
-    replyCount: 5,
-  },
-  {
-    id: "c3",
-    authorDisplayName: "Code & Coffee",
-    authorProfileImageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
-    textDisplay: "Built an entire web client just to test playback on this exact video. It works wonderfully!",
-    likeCount: 8940,
-    publishedAt: "2024-06-10T09:45:00Z",
-    replyCount: 2,
-  },
-];
 
 export class MockYouTubeDataProvider implements IYouTubeDataProvider {
   readonly name = "Mock/Demo Provider";
@@ -285,7 +248,6 @@ export class MockYouTubeDataProvider implements IYouTubeDataProvider {
       viewCountFormatted: "1M views",
       likeCount: 50000,
       likeCountFormatted: "50K",
-      commentCount: 1200,
     };
   }
 
@@ -312,10 +274,6 @@ export class MockYouTubeDataProvider implements IYouTubeDataProvider {
   async getChannelVideos(channelId: string): Promise<YouTubeFeedResponse> {
     const channelVideos = MOCK_VIDEOS.filter((v) => v.channelId === channelId);
     return { videos: channelVideos.length > 0 ? channelVideos : MOCK_VIDEOS.slice(0, 4) };
-  }
-
-  async getVideoComments(videoId: string): Promise<{ comments: YouTubeComment[] }> {
-    return { comments: MOCK_COMMENTS };
   }
 
   async getUserSubscriptions(): Promise<{ channels: YouTubeChannel[] }> {

@@ -24,17 +24,21 @@ export function HTML5Player({
   onSwitchToEmbed,
 }: HTML5PlayerProps) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [streamError, setStreamError] = useState<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastRecordedTimeRef = useRef<number>(0);
 
-  // Load stream URL
+  // Load stream URLs
   useEffect(() => {
     let isCancelled = false;
     setLoading(true);
     setStreamError(null);
     setStreamUrl(null);
+    setAudioUrl(null);
 
     fetch(`/api/stream?id=${encodeURIComponent(videoId)}`)
       .then((res) => res.json())
@@ -42,6 +46,7 @@ export function HTML5Player({
         if (isCancelled) return;
         if (data.hasDirectStream && data.streamUrl) {
           setStreamUrl(data.streamUrl);
+          setAudioUrl(data.audioUrl || null);
         } else {
           setStreamError(
             data.message ||
@@ -64,16 +69,30 @@ export function HTML5Player({
 
   // Set initial progress timestamp if resuming
   useEffect(() => {
-    if (videoRef.current && initialProgressSeconds > 0 && streamUrl) {
-      videoRef.current.currentTime = initialProgressSeconds;
+    if (initialProgressSeconds > 0) {
+      if (videoRef.current && streamUrl) {
+        videoRef.current.currentTime = initialProgressSeconds;
+      }
+      if (audioRef.current && audioUrl) {
+        audioRef.current.currentTime = initialProgressSeconds;
+      }
     }
-  }, [streamUrl, initialProgressSeconds]);
+  }, [streamUrl, audioUrl, initialProgressSeconds]);
 
-  // Sync watch progress to history every 5 seconds
+  // Sync watch progress to history and keep audio track synchronized
   const handleTimeUpdate = () => {
     const video = videoRef.current;
     if (!video) return;
 
+    // Synchronize dual audio track if present
+    if (audioRef.current && !video.paused) {
+      const drift = Math.abs(audioRef.current.currentTime - video.currentTime);
+      if (drift > 0.25) {
+        audioRef.current.currentTime = video.currentTime;
+      }
+    }
+
+    // Record watch progress every 5 seconds
     const curr = Math.floor(video.currentTime);
     if (curr > 0 && Math.abs(curr - lastRecordedTimeRef.current) >= 5) {
       lastRecordedTimeRef.current = curr;
@@ -89,6 +108,62 @@ export function HTML5Player({
         }),
       }).catch(() => {});
     }
+  };
+
+  // Synchronized playback controls for audio track
+  const handlePlay = () => {
+    if (audioRef.current && audioRef.current.paused) {
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
+  const handlePause = () => {
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
+  };
+
+  const handleSeek = () => {
+    if (audioRef.current && videoRef.current) {
+      audioRef.current.currentTime = videoRef.current.currentTime;
+    }
+  };
+
+  const handleVolumeChange = () => {
+    if (audioRef.current && videoRef.current) {
+      audioRef.current.volume = videoRef.current.volume;
+      audioRef.current.muted = videoRef.current.muted;
+    }
+  };
+
+  const handleRateChange = () => {
+    if (audioRef.current && videoRef.current) {
+      audioRef.current.playbackRate = videoRef.current.playbackRate;
+    }
+  };
+
+  const handleWaiting = () => {
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
+  };
+
+  const handlePlaying = () => {
+    if (audioRef.current && videoRef.current && !videoRef.current.paused) {
+      const drift = Math.abs(audioRef.current.currentTime - videoRef.current.currentTime);
+      if (drift > 0.15) {
+        audioRef.current.currentTime = videoRef.current.currentTime;
+      }
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
+  const handleEnded = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    onEnded?.();
   };
 
   const handleVideoError = () => {
@@ -108,7 +183,7 @@ export function HTML5Player({
     );
   }
 
-  // Fallback notice if stream is unavailable or error in native mode
+  // Fallback notice if stream is genuinely unavailable
   if (!streamUrl || streamError) {
     return (
       <div className="relative flex aspect-video w-full flex-col items-center justify-center rounded-2xl bg-zinc-950 border border-zinc-800 p-6 text-center text-white shadow-xl overflow-hidden">
@@ -157,7 +232,7 @@ export function HTML5Player({
     );
   }
 
-  // Native HTML5 <video controls> Player - Default browser appearance and behavior
+  // Native HTML5 <video controls> Player with synchronized audio track
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-xl">
       <video
@@ -167,13 +242,31 @@ export function HTML5Player({
         controls
         autoPlay
         playsInline
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onSeeking={handleSeek}
+        onSeeked={handleSeek}
+        onVolumeChange={handleVolumeChange}
+        onRateChange={handleRateChange}
+        onWaiting={handleWaiting}
+        onPlaying={handlePlaying}
         onError={handleVideoError}
-        onEnded={onEnded}
+        onEnded={handleEnded}
         onTimeUpdate={handleTimeUpdate}
         className="h-full w-full object-contain"
       >
         Your browser does not support the video tag.
       </video>
+
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          preload="auto"
+          className="hidden"
+          onError={() => console.warn("Audio track error in HTML5 player")}
+        />
+      )}
     </div>
   );
 }

@@ -114,17 +114,6 @@ class YouTubeService {
     );
   }
 
-  async getVideoComments(videoId: string, pageToken?: string) {
-    const key = `comments:${videoId}:${pageToken || "first"}`;
-    return this.executeWithFallback(key, 600, (p) =>
-      p.getVideoComments(videoId, pageToken)
-    );
-  }
-
-  async getCommentReplies(replyToken: string) {
-    return await this.publicProvider.getCommentReplies(replyToken);
-  }
-
   async getUserSubscriptions(accessToken?: string, pageToken?: string) {
     if (accessToken) {
       try {

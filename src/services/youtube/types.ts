@@ -27,7 +27,6 @@ export interface YouTubeVideo {
   viewCountFormatted: string;
   likeCount?: number;
   likeCountFormatted?: string;
-  commentCount?: number;
   isLive?: boolean;
   tags?: string[];
 }
@@ -44,19 +43,6 @@ export interface YouTubeChannel {
   subscriberCountFormatted: string;
   videoCount: number;
   viewCount: number;
-}
-
-export interface YouTubeComment {
-  id: string;
-  authorDisplayName: string;
-  authorProfileImageUrl: string;
-  authorChannelUrl?: string;
-  textDisplay: string;
-  likeCount: number;
-  publishedAt: string;
-  replyCount?: number;
-  replyContinuationToken?: string;
-  replies?: YouTubeComment[];
 }
 
 export interface YouTubePlaylistMeta {

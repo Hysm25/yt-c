@@ -1,7 +1,6 @@
 import {
   YouTubeVideo,
   YouTubeChannel,
-  YouTubeComment,
   YouTubePlaylistMeta,
   YouTubeFeedResponse,
   YouTubeSearchResponse,
@@ -40,11 +39,6 @@ export interface IYouTubeDataProvider {
     channelId: string,
     pageToken?: string
   ): Promise<YouTubeFeedResponse>;
-
-  getVideoComments(
-    videoId: string,
-    pageToken?: string
-  ): Promise<{ comments: YouTubeComment[]; nextPageToken?: string }>;
 
   getUserSubscriptions(
     accessToken: string,

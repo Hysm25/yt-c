@@ -143,11 +143,7 @@ async function runTestSuite() {
 
   const video = await youtubeService.getVideoDetails(feed.videos[0].id);
   if (!video || !video.title) throw new Error("getVideoDetails failed");
-  console.log(`✓ Video details verified: "${video.title}"`);
-
-  const comments = await youtubeService.getVideoComments(feed.videos[0].id);
-  if (!comments.comments) throw new Error("getVideoComments failed");
-  console.log(`✓ Video comments verified (${comments.comments.length} comments)`);
+  console.log(`✓ Video details & description verified: "${video.title}" (description: ${video.description.length} chars)`);
 
   const searchRes = await youtubeService.search("music");
   if (!searchRes.items || searchRes.items.length === 0) throw new Error("search failed");

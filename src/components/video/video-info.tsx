@@ -249,25 +249,51 @@ export function VideoInfo({ video, channel }: VideoInfoProps) {
       </div>
 
       {/* Expandable Description Box */}
-      <div className="rounded-2xl bg-secondary/50 hover:bg-secondary/70 p-3.5 sm:p-4 text-xs sm:text-sm transition-colors">
-        <div className="flex items-center gap-2 font-semibold pb-1.5 text-xs">
+      <div
+        onClick={() => !isExpanded && setIsExpanded(true)}
+        className="cursor-pointer rounded-2xl bg-secondary/50 hover:bg-secondary/70 p-3.5 sm:p-4 text-xs sm:text-sm transition-colors"
+      >
+        <div className="flex items-center gap-2 font-semibold pb-1.5 text-xs text-foreground">
           <span>{video.viewCountFormatted}</span>
           <span>•</span>
           <span>{formatRelativeTime(video.publishedAt)}</span>
         </div>
 
-        <p
-          className={`whitespace-pre-line text-muted-foreground leading-relaxed ${
+        <div
+          className={`whitespace-pre-wrap break-words text-muted-foreground leading-relaxed text-xs sm:text-sm ${
             isExpanded ? "" : "line-clamp-3"
           }`}
         >
-          {video.description || "No description provided."}
-        </p>
+          {video.description ? (
+            video.description.split(/(https?:\/\/[^\s]+)/g).map((part, idx) => {
+              if (part.match(/^https?:\/\//)) {
+                return (
+                  <a
+                    key={idx}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline font-medium break-all"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {part}
+                  </a>
+                );
+              }
+              return <React.Fragment key={idx}>{part}</React.Fragment>;
+            })
+          ) : (
+            "No description provided."
+          )}
+        </div>
 
         {video.description && video.description.length > 120 && (
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="pt-2 font-semibold text-foreground hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            className="pt-2 font-semibold text-foreground hover:underline block"
           >
             {isExpanded ? "Show less" : "...more"}
           </button>

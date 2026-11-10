@@ -5,7 +5,6 @@ import {
 import {
   YouTubeVideo,
   YouTubeChannel,
-  YouTubeComment,
   YouTubePlaylistMeta,
   YouTubeFeedResponse,
   YouTubeSearchResponse,
@@ -69,7 +68,6 @@ export class OfficialYouTubeApiProvider implements IYouTubeDataProvider {
     const durationSeconds = parseIsoDuration(item.contentDetails?.duration || "");
     const viewCount = parseInt(item.statistics?.viewCount || "0", 10);
     const likeCount = parseInt(item.statistics?.likeCount || "0", 10);
-    const commentCount = parseInt(item.statistics?.commentCount || "0", 10);
 
     return {
       id: typeof item.id === "string" ? item.id : item.id?.videoId || "",
@@ -85,7 +83,6 @@ export class OfficialYouTubeApiProvider implements IYouTubeDataProvider {
       viewCountFormatted: formatViewCount(viewCount),
       likeCount,
       likeCountFormatted: formatViewCount(likeCount).replace(" views", ""),
-      commentCount,
       isLive: item.snippet?.liveBroadcastContent === "live",
       tags: item.snippet?.tags || [],
     };
@@ -272,39 +269,6 @@ export class OfficialYouTubeApiProvider implements IYouTubeDataProvider {
 
     return {
       videos,
-      nextPageToken: data.nextPageToken,
-    };
-  }
-
-  async getVideoComments(
-    videoId: string,
-    pageToken?: string
-  ): Promise<{ comments: YouTubeComment[]; nextPageToken?: string }> {
-    const params: Record<string, string> = {
-      part: "snippet,replies",
-      videoId,
-      maxResults: "25",
-      order: "relevance",
-    };
-    if (pageToken) params.pageToken = pageToken;
-
-    const data = await this.fetchApi("commentThreads", params);
-    const comments: YouTubeComment[] = (data.items || []).map((item: any) => {
-      const top = item.snippet?.topLevelComment?.snippet;
-      return {
-        id: item.id,
-        authorDisplayName: top?.authorDisplayName || "Viewer",
-        authorProfileImageUrl: top?.authorProfileImageUrl || "",
-        authorChannelUrl: top?.authorChannelUrl,
-        textDisplay: top?.textDisplay || "",
-        likeCount: top?.likeCount || 0,
-        publishedAt: top?.publishedAt || "",
-        replyCount: item.snippet?.totalReplyCount || 0,
-      };
-    });
-
-    return {
-      comments,
       nextPageToken: data.nextPageToken,
     };
   }
