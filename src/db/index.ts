@@ -21,6 +21,18 @@ export function getDatabase() {
     return dbInstance;
   }
 
+  // Only auto-initialize tables at runtime, not during static build collection
+  const isBuildPhase =
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.npm_lifecycle_event === "build";
+
+  if (isBuildPhase) {
+    // Ephemeral in-memory PGlite for static build analysis to avoid concurrent worker directory lock collisions
+    const pglite = new PGlite();
+    dbInstance = drizzlePglite(pglite, { schema });
+    return dbInstance;
+  }
+
   // Embedded local PGlite (zero-dependency / zero-daemon embedded PostgreSQL)
   const dataDir = path.resolve(process.cwd(), ".data/pglite");
   if (!fs.existsSync(dataDir)) {
@@ -30,12 +42,7 @@ export function getDatabase() {
   const pglite = new PGlite(dataDir);
   dbInstance = drizzlePglite(pglite, { schema });
 
-  // Only auto-initialize tables at runtime, not during static build collection
-  const isBuildPhase =
-    process.env.NEXT_PHASE === "phase-production-build" ||
-    process.env.npm_lifecycle_event === "build";
-
-  if (!isBuildPhase && !tablesInitialized) {
+  if (!tablesInitialized) {
     tablesInitialized = true;
     initEmbeddedTables(pglite).catch((err) => {
       console.warn("Table auto-migration notice:", err);
