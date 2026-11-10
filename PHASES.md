@@ -30,35 +30,35 @@
 - [x] Verify YouTube API service operations and cache behavior
 
 ## Phase 4: Full-Featured Custom HTML5 Video Player
-- [ ] Implement custom HTML5 `<video>` Player component with custom styling:
-  - [ ] Play, Pause, Replay, and Seeking
-  - [ ] Interactive timeline scrubber with buffer progress and timestamp hover tooltip
-  - [ ] Volume slider and mute toggle
-  - [ ] Playback speed selector (0.25x, 0.5x, 0.75x, 1x, 1.25x, 1.5x, 1.75x, 2x)
-  - [ ] Resolution/Quality switcher
-  - [ ] Subtitles / Closed Captions (CC) parser and renderer
-  - [ ] Fullscreen, Theater mode, and Picture-in-Picture (PiP)
-  - [ ] Standard YouTube keyboard shortcuts (Space/K, J/L, Arrows, M, F, T)
-  - [ ] Auto-advance / Autoplay toggle
-- [ ] Implement dual Playback Provider system:
-  - [ ] Direct Stream Provider (HTML5 native playback via stream resolver/proxy)
-  - [ ] Official YouTube IFrame / Embed Provider (resilient fallback toggle ensuring 100% playback guarantee)
-- [ ] Implement watch progress tracking and auto-resume from last timestamp
-- [ ] Verify player features, provider switching, and keyboard navigation
+- [x] Implement custom HTML5 `<video>` Player component with custom styling:
+  - [x] Play, Pause, Replay, and Seeking
+  - [x] Interactive timeline scrubber with buffer progress and timestamp hover tooltip
+  - [x] Volume slider and mute toggle
+  - [x] Playback speed selector (0.25x, 0.5x, 0.75x, 1x, 1.25x, 1.5x, 1.75x, 2x)
+  - [x] Resolution/Quality switcher
+  - [x] Subtitles / Closed Captions (CC) parser and renderer
+  - [x] Fullscreen, Theater mode, and Picture-in-Picture (PiP)
+  - [x] Standard YouTube keyboard shortcuts (Space/K, J/L, Arrows, M, F, T)
+  - [x] Auto-advance / Autoplay toggle
+- [x] Implement dual Playback Provider system:
+  - [x] Direct Stream Provider (HTML5 native playback via stream resolver/proxy)
+  - [x] Official YouTube IFrame / Embed Provider (resilient fallback toggle ensuring 100% playback guarantee)
+- [x] Implement watch progress tracking and auto-resume from last timestamp
+- [x] Verify player features, provider switching, and keyboard navigation
 
 ## Phase 5: Client User Experience & Pages
-- [ ] Home Page (`/`): Category chips, video feed cards with duration, views, relative timestamp, and channel avatar
-- [ ] Watch Page (`/watch?v=...`): Player view, expandable description, channel info, subscribe/like actions, comments section, and related video suggestions
-- [ ] Search Page (`/search?q=...`): Rich result cards (videos, channels, playlists), filters, and sort options
-- [ ] Channel Page (`/channel/[id]`): Channel header, tabs (Home, Videos, Playlists, About), and video grids
-- [ ] Subscriptions Page (`/subscriptions`): Latest uploads feed from subscribed channels and channel quick-list
-- [ ] Library & History Page (`/history`, `/library`, `/liked`): Local and synced history with progress bar indicators, resume playback, and clear history
-- [ ] Playlists Management (`/playlists`, `/playlist/[id]`): View, create, and manage playlists
-- [ ] Settings Page (`/settings`): Configure preferred playback provider (HTML5 Direct vs YouTube Embed), custom API key, theme preferences, and data clear options
-- [ ] Verify all routes, responsive mobile/desktop design, and navigation
+- [x] Home Page (`/`): Category chips, video feed cards with duration, views, relative timestamp, and channel avatar
+- [x] Watch Page (`/watch?v=...`): Player view, expandable description, channel info, subscribe/like actions, comments section, and related video suggestions
+- [x] Search Page (`/search?q=...`): Rich result cards (videos, channels, playlists), filters, and sort options
+- [x] Channel Page (`/channel/[id]`): Channel header, tabs (Home, Videos, Playlists, About), and video grids
+- [x] Subscriptions Page (`/subscriptions`): Latest uploads feed from subscribed channels and channel quick-list
+- [x] Library & History Page (`/history`, `/library`, `/liked`): Local and synced history with progress bar indicators, resume playback, and clear history
+- [x] Playlists Management (`/playlists`, `/playlist/[id]`): View, create, and manage playlists
+- [x] Settings Page (`/settings`): Configure preferred playback provider (HTML5 Direct vs YouTube Embed), custom API key, theme preferences, and data clear options
+- [x] Verify all routes, responsive mobile/desktop design, and navigation
 
 ## Phase 6: Verification, Polishing, Production Build & Handoff
-- [ ] Run comprehensive production build (`pnpm build`) and fix any lint/type errors
-- [ ] End-to-end flow verification (Home -> Search -> Watch -> Channel -> History -> Settings)
-- [ ] Verify security guidelines (no leaked secrets, sanitized inputs, safe token handling)
-- [ ] Finalize `PHASES.md` and `PROGRESS.md` with complete handoff documentation
+- [x] Run comprehensive production build (`pnpm build`) and fix any lint/type errors
+- [x] End-to-end flow verification (Home -> Search -> Watch -> Channel -> History -> Settings)
+- [x] Verify security guidelines (no leaked secrets, sanitized inputs, safe token handling)
+- [x] Finalize `PHASES.md` and `PROGRESS.md` with complete handoff documentation
