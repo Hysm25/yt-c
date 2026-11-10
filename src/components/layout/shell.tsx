@@ -18,7 +18,13 @@ export function Shell({ children }: ShellProps) {
 
   // In watch page, default to collapsed sidebar for theater immersion
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isWatchPage);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [playbackProvider, setPlaybackProvider] = useState<"html5" | "embed">("html5");
+
+  // Close mobile drawer on route navigation
+  useEffect(() => {
+    setIsMobileDrawerOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const savedProvider = localStorage.getItem("yt-playback-provider") as "html5" | "embed" | null;
@@ -36,7 +42,11 @@ export function Shell({ children }: ShellProps) {
   };
 
   const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => !prev);
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setIsMobileDrawerOpen((prev) => !prev);
+    } else {
+      setSidebarCollapsed((prev) => !prev);
+    }
   };
 
   return (
@@ -50,14 +60,29 @@ export function Shell({ children }: ShellProps) {
 
       {/* Main Container */}
       <div className="flex flex-1">
-        {/* Persistent Sidebar (hidden completely on mobile watch page, adaptive on desktop) */}
+        {/* Persistent Desktop Sidebar */}
         {!isWatchPage && <Sidebar collapsed={sidebarCollapsed} />}
+
+        {/* Slide-out Mobile Navigation Drawer */}
+        {isMobileDrawerOpen && (
+          <div className="fixed inset-0 z-50 flex md:hidden">
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+              onClick={() => setIsMobileDrawerOpen(false)}
+            />
+            {/* Drawer */}
+            <div className="relative z-10 h-full shadow-2xl transition-transform">
+              <Sidebar isMobile onCloseMobile={() => setIsMobileDrawerOpen(false)} />
+            </div>
+          </div>
+        )}
 
         {/* Page Content */}
         <main
           className={cn(
             "flex-1 overflow-y-auto pb-16 sm:pb-4",
-            isWatchPage ? "px-0 sm:px-4 py-2" : "p-3 sm:p-6"
+            isWatchPage ? "px-0 sm:px-4 py-0 sm:py-2" : "p-3 sm:p-6"
           )}
         >
           {children}

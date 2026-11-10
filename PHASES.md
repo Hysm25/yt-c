@@ -32,33 +32,36 @@
 ## Phase 4: Full-Featured Custom HTML5 Video Player
 - [x] Implement custom HTML5 `<video>` Player component with custom styling:
   - [x] Play, Pause, Replay, and Seeking
-  - [x] Interactive timeline scrubber with buffer progress and timestamp hover tooltip
+  - [x] Interactive timeline scrubber with buffer progress, touch dragging, and timestamp hover tooltip
+  - [x] Double-tap seeking gestures on mobile (±10s) and double-click to toggle fullscreen
   - [x] Volume slider and mute toggle
   - [x] Playback speed selector (0.25x, 0.5x, 0.75x, 1x, 1.25x, 1.5x, 1.75x, 2x)
   - [x] Resolution/Quality switcher
   - [x] Subtitles / Closed Captions (CC) parser and renderer
   - [x] Fullscreen, Theater mode, and Picture-in-Picture (PiP)
   - [x] Standard YouTube keyboard shortcuts (Space/K, J/L, Arrows, M, F, T)
-  - [x] Auto-advance / Autoplay toggle
+  - [x] Auto-advance / Autoplay toggle with smooth transition
 - [x] Implement dual Playback Provider system:
   - [x] Direct Stream Provider (HTML5 native playback via stream resolver/proxy)
-  - [x] Official YouTube IFrame / Embed Provider (resilient fallback toggle ensuring 100% playback guarantee)
-- [x] Implement watch progress tracking and auto-resume from last timestamp
-- [x] Verify player features, provider switching, and keyboard navigation
+  - [x] Official YouTube IFrame / Embed Provider with postMessage API progress synchronization and auto-advance
+  - [x] Automatic fallback to Embed Player when cipher-protection is detected
+- [x] Implement watch progress tracking and auto-resume from last timestamp across engines
+- [x] Verify player features, provider switching, mobile touch scrubbing, and keyboard navigation
 
 ## Phase 5: Client User Experience & Pages
 - [x] Home Page (`/`): Category chips, video feed cards with duration, views, relative timestamp, and channel avatar
-- [x] Watch Page (`/watch?v=...`): Player view, expandable description, channel info, subscribe/like actions, comments section, and related video suggestions
+- [x] Watch Page (`/watch?v=...`): Player view, expandable description, channel info, subscribe/like actions, comments section, and related video suggestions (with client-side Next.js routing)
 - [x] Search Page (`/search?q=...`): Rich result cards (videos, channels, playlists), filters, and sort options
 - [x] Channel Page (`/channel/[id]`): Channel header, tabs (Home, Videos, Playlists, About), and video grids
-- [x] Subscriptions Page (`/subscriptions`): Latest uploads feed from subscribed channels and channel quick-list
-- [x] Library & History Page (`/history`, `/library`, `/liked`): Local and synced history with progress bar indicators, resume playback, and clear history
+- [x] Subscriptions Page (`/subscriptions`): Latest uploads feed from subscribed channels and channel quick-list with Google Sign-In prompt
+- [x] Library & History Page (`/history`, `/library`, `/liked`): Local and synced history with progress bar indicators, resume playback, and mobile-friendly clear/delete buttons
 - [x] Playlists Management (`/playlists`, `/playlist/[id]`): View, create, and manage playlists
-- [x] Settings Page (`/settings`): Configure preferred playback provider (HTML5 Direct vs YouTube Embed), custom API key, theme preferences, and data clear options
-- [x] Verify all routes, responsive mobile/desktop design, and navigation
+- [x] Settings Page (`/settings`): Configure preferred playback provider, Google account connection status / sign-out, custom API key, theme preferences, and data clear options
+- [x] Header & Navigation: Full-width expandable mobile search, slide-out mobile drawer with backdrop, and interactive UserMenu (Google Sign-In modal & Sign-Out)
+- [x] Verify all routes, responsive mobile/tablet/desktop design, and navigation
 
 ## Phase 6: Verification, Polishing, Production Build & Handoff
 - [x] Run comprehensive production build (`pnpm build`) and fix any lint/type errors
-- [x] End-to-end flow verification (Home -> Search -> Watch -> Channel -> History -> Settings)
+- [x] End-to-end flow verification (Home -> Search -> Watch -> Channel -> History -> Settings) across screen sizes
 - [x] Verify security guidelines (no leaked secrets, sanitized inputs, safe token handling)
 - [x] Finalize `PHASES.md` and `PROGRESS.md` with complete handoff documentation

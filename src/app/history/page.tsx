@@ -148,7 +148,7 @@ export default function HistoryPage() {
                     {/* Delete Item Button */}
                     <button
                       onClick={() => removeHistoryItem(item.videoId)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all"
+                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 hover:text-red-500 transition-all"
                       title="Remove from history"
                     >
                       <X className="h-4 w-4" />

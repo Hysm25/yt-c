@@ -7,27 +7,28 @@ A modern, full-featured **YouTube Web Client** featuring an independent custom u
 ## ✨ Features
 
 ### 🎬 Custom HTML5 Video Player
-- **Native Custom Controls**: Interactive timeline scrubber with live buffered progress and hover preview timestamps.
+- **Native Custom Controls**: Interactive timeline scrubber with live buffered progress, touch scrubbing, and hover preview timestamps.
+- **Mobile Gestures**: Double-tap left or right to seek ±10 seconds with visual pill feedback; touch-to-show auto-hiding controls (3.5s timeout).
 - **Playback Controls**: Play, pause, 10s jump backward/forward, volume slider with mute toggle and local memory.
 - **Speed & Quality Selectors**: Variable playback rate (0.25x, 0.5x, 0.75x, 1x, 1.25x, 1.5x, 1.75x, 2x) and resolution switching.
 - **Subtitles & Closed Captions (CC)**: In-player subtitle parser and overlay renderer.
-- **Display Modes**: Standard view, Fullscreen, Theater mode, and native browser Picture-in-Picture (PiP).
-- **Auto-Advance**: Seamlessly plays the next related video upon playback completion.
-- **Watch Progress Auto-Resume**: Periodically syncs watch position every 5 seconds; auto-resumes from previous timestamp.
+- **Display Modes**: Standard view, Fullscreen (double-click video to toggle), Theater mode, and native browser Picture-in-Picture (PiP).
+- **Auto-Advance & Progress Sync**: Automatically transitions to next related video upon completion and syncs watch progress every 5 seconds (both HTML5 and Embed engines).
 - **Standard YouTube Keyboard Shortcuts**: Full hotkey support for intuitive navigation.
 
 ### 🔄 Dual-Playback Engine
 - **Direct HTML5 Stream Engine**: Streams open media assets directly via HTML5 `<video>`.
-- **Official YouTube Embed Engine**: Privacy-enhanced YouTube IFrame embed (`youtube-nocookie.com`) ensuring 100% video playback compatibility for cipher-protected videos.
-- **Real-Time Toggle**: Switch between playback engines instantly from the header or directly on the player overlay without page reloads.
+- **Official YouTube Embed Engine**: Privacy-enhanced YouTube IFrame embed (`youtube-nocookie.com`) ensuring 100% video playback compatibility for cipher-protected videos with postMessage API synchronization.
+- **Automatic Fallback & Real-Time Toggle**: Auto-falls back to Embed engine when signature ciphers are detected, or switch between playback engines instantly from the header or player overlay.
 
 ### 🌐 Quota-Aware YouTube Data Integration
 - **Official YouTube Data API v3**: Fetches trending feeds, search results, video metadata, comments, channel profiles, and user subscriptions.
 - **In-Memory Quota Shield**: Built-in TTL/LRU caching protects Google Cloud's 10,000 units/day quota.
 - **Offline / Fallback Provider**: High-fidelity offline data provider automatically serves playable sample content if API quota is exhausted or if no API key is configured.
 
-### 🔐 Authentication & User Persistence
-- **Auth.js (NextAuth v5)**: Google OAuth integration with offline access tokens and auto-refresh for YouTube scopes (`youtube.readonly`, `youtube.force-ssl`).
+### 🔐 Authentication, Navigation & User Persistence
+- **Auth.js (NextAuth v5)**: Google OAuth integration with interactive user menu in header, offline access tokens, and auto-refresh for YouTube scopes (`youtube.readonly`, `youtube.force-ssl`).
+- **Responsive Navigation**: Full-width expandable mobile search, slide-out mobile drawer with backdrop, and bottom navigation bar for mobile viewports.
 - **Zero-Daemon Local Database**: Embedded **PGlite** (WebAssembly PostgreSQL) operates inside `.data/pglite` without requiring Docker or a running PostgreSQL daemon.
 - **External PostgreSQL Support**: Seamlessly connects to external PostgreSQL (e.g. Supabase, Neon, AWS RDS) by setting `DATABASE_URL`.
 - **Guest Mode**: Full local persistence for watch history, custom playlists, liked videos, and settings without requiring login.

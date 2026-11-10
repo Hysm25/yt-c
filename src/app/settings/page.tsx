@@ -1,11 +1,27 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Sliders, Film, Tv, Key, Palette, Trash2, Check, Download, Upload } from "lucide-react";
+import { useSession, signIn, signOut } from "next-auth/react";
+import {
+  Sliders,
+  Film,
+  Tv,
+  Key,
+  Palette,
+  Trash2,
+  Check,
+  Download,
+  User,
+  ShieldCheck,
+  LogOut,
+  LogIn,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
 import { useTheme } from "@/components/providers/theme-provider";
 
 export default function SettingsPage() {
+  const { data: session, status: authStatus } = useSession();
   const { theme, setTheme } = useTheme();
 
   const [provider, setProvider] = useState<"html5" | "embed">("html5");
@@ -34,7 +50,9 @@ export default function SettingsPage() {
     e.preventDefault();
     try {
       localStorage.setItem("yt-playback-provider", provider);
-      window.dispatchEvent(new CustomEvent("yt-playback-provider-changed", { detail: provider }));
+      window.dispatchEvent(
+        new CustomEvent("yt-playback-provider-changed", { detail: provider })
+      );
 
       await fetch("/api/settings", {
         method: "POST",
@@ -91,18 +109,88 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl mx-auto p-2 sm:p-4">
+    <div className="flex flex-col gap-6 max-w-3xl mx-auto p-2 sm:p-4 pb-20">
       {/* Header */}
       <div className="flex items-center gap-3 border-b pb-4">
         <Sliders className="h-6 w-6 text-red-500" />
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Settings & Preferences</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+          Settings & Preferences
+        </h1>
       </div>
 
-      <form onSubmit={handleSave} className="flex flex-col gap-8">
+      {/* Account & Authentication Card */}
+      <div className="flex flex-col gap-3 rounded-2xl border bg-secondary/30 p-5">
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-red-500" />
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            Account & Authentication
+          </h2>
+        </div>
+
+        {session?.user ? (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-1">
+            <div className="flex items-center gap-3">
+              <Avatar
+                src={session.user.image || undefined}
+                alt={session.user.name || "User"}
+                fallback={session.user.name || "U"}
+                size="lg"
+              />
+              <div className="flex flex-col">
+                <span className="font-semibold text-sm">
+                  {session.user.name || "Connected User"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {session.user.email}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] text-green-500 font-medium pt-0.5">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Google OAuth Active (YouTube Scopes Granted)
+                </span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => signOut()}
+              className="gap-1.5 text-xs text-destructive hover:bg-destructive/10"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Sign Out</span>
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-1">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-foreground">
+                Guest Mode (Local Persistence)
+              </span>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
+                You are currently browsing as a Guest. Your watch history, playlists, and liked videos are saved to your local PostgreSQL database. Connect your Google account to sync live YouTube subscriptions and playlists.
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={() => signIn("google")}
+              className="gap-2 text-xs font-semibold shrink-0"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              <span>Sign in with Google</span>
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSave} className="flex flex-col gap-6">
         {/* Playback Provider Section */}
         <div className="flex flex-col gap-3 rounded-2xl border bg-secondary/30 p-5">
           <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Playback Engine
+            Default Playback Engine
           </h2>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Choose your preferred video player. The HTML5 engine uses native custom player controls,

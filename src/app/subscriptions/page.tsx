@@ -2,12 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSession, signIn } from "next-auth/react";
 import { YouTubeChannel, YouTubeVideo } from "@/services/youtube/types";
 import { Avatar } from "@/components/ui/avatar";
 import { VideoGrid } from "@/components/video/video-grid";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Tv, LogIn } from "lucide-react";
 
 export default function SubscriptionsPage() {
+  const { data: session } = useSession();
   const [channels, setChannels] = useState<YouTubeChannel[]>([]);
   const [feedVideos, setFeedVideos] = useState<YouTubeVideo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,8 +32,36 @@ export default function SubscriptionsPage() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto p-2 sm:p-4">
-      <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Subscriptions</h1>
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto p-2 sm:p-4 pb-20">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Subscriptions</h1>
+      </div>
+
+      {/* Unauthenticated Sync Banner */}
+      {!session?.user && !loading && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-secondary/40 border border-border">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600/10 text-red-500">
+              <Tv className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Sync Your Live Subscriptions</h3>
+              <p className="text-xs text-muted-foreground pt-0.5">
+                Sign in with Google to load your personal channel subscriptions and latest uploads feed.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => signIn("google")}
+            className="gap-1.5 text-xs font-semibold shrink-0"
+          >
+            <LogIn className="h-3.5 w-3.5" />
+            <span>Sign in with Google</span>
+          </Button>
+        </div>
+      )}
 
       {/* Subscribed Channels Bar */}
       <div className="flex items-center gap-4 overflow-x-auto pb-3 border-b scrollbar-none">

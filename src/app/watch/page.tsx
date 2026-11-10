@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { YouTubeVideo, YouTubeChannel } from "@/services/youtube/types";
 import { VideoPlayer } from "@/components/player/video-player";
 import { VideoInfo } from "@/components/video/video-info";
@@ -10,6 +10,7 @@ import { VideoCard } from "@/components/video/video-card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function WatchPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const videoId = searchParams.get("v") || "dQw4w9WgXcQ";
 
@@ -23,6 +24,7 @@ function WatchPageContent() {
   useEffect(() => {
     let isCancelled = false;
     setLoading(true);
+    setInitialProgress(0);
 
     // Fetch video details & related
     fetch(`/api/youtube/video/${encodeURIComponent(videoId)}`)
@@ -65,7 +67,7 @@ function WatchPageContent() {
 
   const handleNextVideo = () => {
     if (relatedVideos.length > 0) {
-      window.location.href = `/watch?v=${relatedVideos[0].id}`;
+      router.push(`/watch?v=${relatedVideos[0].id}`);
     }
   };
 
@@ -93,9 +95,9 @@ function WatchPageContent() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto p-2 sm:p-4">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto p-0 sm:p-4">
       {/* Main Watch Column: Video Player, Video Metadata, Comments */}
-      <div className="lg:col-span-2 flex flex-col gap-4">
+      <div className="lg:col-span-2 flex flex-col gap-4 px-2 sm:px-0">
         {/* Player Container */}
         <VideoPlayer
           videoId={videoId}
@@ -118,7 +120,7 @@ function WatchPageContent() {
       </div>
 
       {/* Right Column: Up Next / Related Videos */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 px-3 sm:px-0 pb-12 sm:pb-0">
         <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground px-1 pb-1">
           Related Videos
         </h3>
@@ -134,7 +136,7 @@ function WatchPageContent() {
 
 export default function WatchPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center">Loading player...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading player...</div>}>
       <WatchPageContent />
     </Suspense>
   );

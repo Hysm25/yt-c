@@ -32,7 +32,7 @@ function VideoPlayerInner({
       className={cn(
         "w-full transition-all duration-300 ease-in-out",
         isTheaterMode
-          ? "max-w-none col-span-full mb-4"
+          ? "max-w-none col-span-full mb-4 w-full"
           : "max-w-5xl mx-auto mb-3"
       )}
     >
@@ -49,7 +49,11 @@ function VideoPlayerInner({
       ) : (
         <EmbedPlayer
           videoId={videoId}
+          title={title}
+          channelTitle={channelTitle}
           initialProgressSeconds={initialProgressSeconds}
+          onEnded={onEnded}
+          onNextVideo={onNextVideo}
         />
       )}
     </div>

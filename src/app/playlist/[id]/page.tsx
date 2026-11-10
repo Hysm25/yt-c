@@ -147,7 +147,7 @@ export default function PlaylistDetailPage() {
 
                 <button
                   onClick={() => handleRemoveItem(item.videoId)}
-                  className="opacity-0 group-hover:opacity-100 p-2 hover:text-red-500 transition-all"
+                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-2 hover:text-red-500 transition-all"
                   title="Remove from playlist"
                 >
                   <X className="h-4 w-4" />

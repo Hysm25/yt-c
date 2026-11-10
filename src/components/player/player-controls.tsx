@@ -81,23 +81,34 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
     seek(pos * duration);
   };
 
+  const handleScrubberTouch = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!scrubberRef.current || duration <= 0) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const rect = scrubberRef.current.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+    seek(pos * duration);
+  };
+
   const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   const qualities = ["auto", "1080p", "720p", "480p", "360p"];
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/20 to-transparent p-2 sm:p-4 text-white transition-opacity duration-300">
+    <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/30 to-transparent p-2 sm:p-4 text-white transition-opacity duration-300">
       {/* Timeline Scrubber Container */}
       <div
         ref={scrubberRef}
         onMouseMove={handleScrubberMouseMove}
         onMouseLeave={handleScrubberMouseLeave}
         onClick={handleScrubberClick}
-        className="group relative flex h-6 w-full cursor-pointer items-center select-none"
+        onTouchStart={handleScrubberTouch}
+        onTouchMove={handleScrubberTouch}
+        className="group relative flex h-7 w-full cursor-pointer items-center select-none"
       >
         {/* Scrubber Hover Tooltip */}
         {hoverTime !== null && (
           <div
-            className="pointer-events-none absolute -top-7 -translate-x-1/2 rounded bg-black/90 px-1.5 py-0.5 text-xs font-mono text-white shadow"
+            className="pointer-events-none absolute -top-8 -translate-x-1/2 rounded bg-black/90 px-2 py-0.5 text-xs font-mono text-white shadow-md border border-white/10"
             style={{ left: `${hoverPosition}%` }}
           >
             {formatDuration(hoverTime)}
@@ -105,7 +116,7 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
         )}
 
         {/* Track Background */}
-        <div className="relative h-1 w-full rounded-full bg-white/20 transition-all group-hover:h-2">
+        <div className="relative h-1.5 w-full rounded-full bg-white/20 transition-all group-hover:h-2.5">
           {/* Buffered Bar */}
           <div
             className="absolute left-0 top-0 h-full rounded-full bg-white/40"
@@ -118,7 +129,7 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
           />
           {/* Scrubber Thumb Knob */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-[#FF0000] shadow transition-transform scale-0 group-hover:scale-100"
+            className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-[#FF0000] shadow transition-transform scale-0 group-hover:scale-100 sm:group-hover:scale-110"
             style={{ left: `${playedPercent}%` }}
           />
         </div>
@@ -127,11 +138,11 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
       {/* Control Buttons Bar */}
       <div className="flex items-center justify-between pt-1">
         {/* Left Controls: Play, Next, Volume, Timestamp */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {/* Play/Pause */}
           <button
             onClick={togglePlay}
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/20 transition-colors focus:outline-none"
             title={isPlaying ? "Pause (k)" : "Play (k)"}
           >
             {isPlaying ? (
@@ -147,8 +158,8 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
           {onNextVideo && (
             <button
               onClick={onNextVideo}
-              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/20 transition-colors"
-              title="Next video (Shift+N)"
+              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/20 transition-colors focus:outline-none"
+              title="Next video"
             >
               <SkipForward className="h-4 w-4" />
             </button>
@@ -158,7 +169,7 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
           <div className="group/volume flex items-center gap-1.5">
             <button
               onClick={toggleMute}
-              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/20 transition-colors focus:outline-none"
               title={isMuted ? "Unmute (m)" : "Mute (m)"}
             >
               {isMuted || volume === 0 ? (
@@ -176,13 +187,13 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
               step="0.05"
               value={isMuted ? 0 : volume}
               onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="h-1 w-0 group-hover/volume:w-16 sm:w-16 transition-all duration-200 accent-[#FF0000]"
+              className="h-1 w-12 sm:w-16 transition-all duration-200 accent-[#FF0000] cursor-pointer"
               title="Volume"
             />
           </div>
 
           {/* Current / Duration Time */}
-          <div className="font-mono text-xs select-none pl-1">
+          <div className="font-mono text-[11px] sm:text-xs select-none pl-1">
             <span>{formatDuration(currentTime)}</span>
             <span className="text-white/60 mx-1">/</span>
             <span className="text-white/80">{formatDuration(duration)}</span>
@@ -190,7 +201,7 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
         </div>
 
         {/* Right Controls: Autoplay, CC, Settings, PiP, Theater, Fullscreen */}
-        <div className="relative flex items-center gap-1 sm:gap-2">
+        <div className="relative flex items-center gap-0.5 sm:gap-2">
           {/* Autoplay Next Toggle */}
           <button
             onClick={toggleAutoplayNext}
@@ -205,7 +216,7 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
             <span className="hidden sm:inline mr-1 text-[11px]">Auto</span>
             <div
               className={cn(
-                "h-2.5 w-2.5 rounded-full transition-colors",
+                "h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full transition-colors",
                 autoplayNext ? "bg-[#FF0000]" : "bg-white/40"
               )}
             />
@@ -240,7 +251,7 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
 
             {/* Settings Popup Menu */}
             {isSettingsOpen && (
-              <div className="absolute right-0 bottom-11 z-50 w-56 rounded-xl border border-white/10 bg-black/90 p-2 text-xs shadow-2xl backdrop-blur-md">
+              <div className="absolute right-0 bottom-11 z-50 w-52 sm:w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-white/10 bg-black/95 p-2 text-xs shadow-2xl backdrop-blur-md">
                 {settingsSubmenu === "main" && (
                   <div className="flex flex-col gap-1">
                     <div className="px-2 py-1 font-semibold text-white/50 uppercase tracking-wider text-[10px]">
@@ -271,6 +282,7 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
                       onClick={() => {
                         const next = activeProvider === "html5" ? "embed" : "html5";
                         setActiveProvider(next);
+                        setIsSettingsOpen(false);
                       }}
                       className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/15 transition-colors"
                     >
@@ -280,10 +292,10 @@ export function PlayerControls({ onNextVideo }: PlayerControlsProps) {
                         ) : (
                           <Tv className="h-3.5 w-3.5 text-blue-400" />
                         )}
-                        <span>Active Engine</span>
+                        <span>Switch Engine</span>
                       </div>
                       <span className="text-[#FF0000] font-semibold uppercase">
-                        {activeProvider}
+                        {activeProvider === "html5" ? "Embed" : "HTML5"}
                       </span>
                     </button>
                   </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { YouTubeComment } from "@/services/youtube/types";
 import { CommentItem } from "./comment-item";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ export function CommentSection({
   videoId,
   initialCommentsCount = 0,
 }: CommentSectionProps) {
+  const { data: session } = useSession();
   const [comments, setComments] = useState<YouTubeComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newCommentText, setNewCommentText] = useState("");
@@ -38,8 +40,8 @@ export function CommentSection({
 
     const newComment: YouTubeComment = {
       id: `local_${Date.now()}`,
-      authorDisplayName: "You",
-      authorProfileImageUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100",
+      authorDisplayName: session?.user?.name || "You",
+      authorProfileImageUrl: session?.user?.image || "",
       textDisplay: newCommentText.trim(),
       likeCount: 0,
       publishedAt: new Date().toISOString(),
@@ -61,7 +63,12 @@ export function CommentSection({
 
       {/* Comment Input */}
       <form onSubmit={handlePostComment} className="flex gap-3 items-start">
-        <Avatar fallback="ME" size="md" className="shrink-0 mt-0.5" />
+        <Avatar
+          src={session?.user?.image || undefined}
+          fallback={session?.user?.name || "U"}
+          size="md"
+          className="shrink-0 mt-0.5"
+        />
         <div className="flex flex-1 flex-col gap-2">
           <input
             type="text"
