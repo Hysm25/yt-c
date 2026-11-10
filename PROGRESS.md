@@ -47,7 +47,10 @@
 - **Phase 6: Verification, Polishing, Production Build & Handoff**:
   - Full production build executed with zero warnings and zero errors (`pnpm build`).
   - Live server smoke tests passed on port 3000 (`/`, `/watch`, `/api/youtube/feed`, `/api/stream`, `/api/history`).
-  - Git repository initialized and committed (`1062d3d`).
+  - Fixed Lucide icon import in playlists pages (`FolderPlay` replaced with `ListVideo`).
+  - Fixed multi-worker PGlite lock collision during static build analysis (`src/db/index.ts`).
+  - Git repository configured with remote `origin`: `https://github.com/Hysm25/yt-c.git`.
+  - Cleaned repository tree: verified `.gitignore` excludes all `.env*`, `.data/`, and node modules; no secrets tracked.
 
 ## 3. Current Implementation Details
 - Next.js 15.5.29 App Router with Turbopack and standalone server configuration.
@@ -82,11 +85,11 @@
 
 ## 5. Tests and Build Results
 - Unit Tests:
-  - Repository test: `ALL REPOSITORY TESTS PASSED SUCCESSFULLY!`
-  - YouTube service test: `ALL YOUTUBE SERVICE TESTS PASSED SUCCESSFULLY!`
+  - Repository CRUD test (`pnpm tsx`): `ALL REPOSITORY TESTS PASSED SUCCESSFULLY!` (Verified user settings, watch progress upsert, playlist items, and like toggle).
+  - YouTube Service test (`pnpm tsx`): `ALL YOUTUBE SERVICE TESTS PASSED SUCCESSFULLY!` (Verified feed retrieval, video details, comments threads, and search queries with fallback cache).
 - Production Build:
   - Command: `pnpm build`
-  - Output: `✓ Compiled successfully in 23.7s`, `✓ Generating static pages (20/20)`
+  - Output: `✓ Compiled successfully in 30.0s`, `✓ Generating static pages (20/20)`
   - Status: BUILD PASSED (Exit code: 0)
 - Live Production Server Smoke Test:
   - Command: `PORT=3000 pnpm start`
@@ -96,6 +99,10 @@
     - `GET /api/youtube/feed` -> HTTP 200 OK (JSON feed)
     - `GET /api/stream?id=L_LUpnjgPso` -> HTTP 200 OK (Resolved MP4 stream)
     - `POST /api/history` & `GET /api/history` -> HTTP 200 OK (Database write & read verified)
+- Remote & Version Control:
+  - Remote: `origin` -> `https://github.com/Hysm25/yt-c.git`
+  - Branches: `main`, `master`
+  - Cleanliness: `.gitignore` protects secrets, `.env*`, and `.data/pglite`. No sensitive credentials tracked.
 
 ## 6. Known Issues and Limitations
 - Google OAuth requires `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` to execute real Google OAuth login. The application automatically provides an unauthenticated guest mode (`userId: "guest"`) enabling full local history, liking, and playlists in the local PostgreSQL database without credentials.
