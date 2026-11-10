@@ -8,8 +8,9 @@
 - [x] Verify baseline production build (`pnpm build`)
 
 ## Phase 2: Data Models, Persistence & Authentication
-- [x] Configure Auth.js (NextAuth v5) with Google OAuth provider and YouTube scopes
+- [x] Configure Auth.js (NextAuth v5) with Google OAuth provider and YouTube scopes (`youtube.readonly`, `youtube.force-ssl`)
 - [x] Implement secure OAuth token lifecycle handling (access token storage & refresh token mechanism)
+- [x] Restore prominent Google Sign In button in navigation header and sidebar prompt cards across screen sizes
 - [x] Handle production configuration safeguards (guaranteed `AUTH_SECRET` fallback and dedicated `/auth/error` UI page)
 - [x] Define database repository services for local user data (watch history, playlists, liked videos, settings)
 - [x] Implement API routes for user data persistence (`/api/history`, `/api/playlists`, `/api/liked`, `/api/settings`)
@@ -25,17 +26,17 @@
   - [x] User subscriptions feed (`subscriptions.list`)
   - [x] User playlists and playlist items (`playlists.list`, `playlistItems.list`)
   - [x] Liked videos feed
-  - [x] Comments thread & pagination
+  - [x] Real comments thread, replies, and pagination via InnerTube & v3 API
 - [x] Implement in-memory/database caching strategy to protect the 10,000 units/day quota
 - [x] Implement fallback mock/offline data mode for quota depletion or unauthenticated browsing
-- [x] Implement public InnerTube browse integration for full channel metadata and continuation pagination
+- [x] Implement public InnerTube browse & next integration for channel metadata, video pagination, comments, and replies
 - [x] Verify YouTube API service operations and cache behavior
 
 ## Phase 4: Native Browser HTML5 Video Player & Dual Playback Engine
 - [x] Implement Native Browser HTML5 `<video controls>` Player:
   - [x] Default browser native controls and appearance (play/pause, scrubber, volume, fullscreen, playback speed)
-  - [x] Stream loading and playback for direct media assets
-  - [x] Seamless auto-switch to YouTube embed on cipher-protected streams without confusing error jargon
+  - [x] Stream loading and playback for direct media assets with verified public open-source media streams
+  - [x] Clear in-player fallback card with one-click switch to YouTube Player for cipher-protected streams
   - [x] Watch progress tracking to local history via `onTimeUpdate`
   - [x] Auto-advance / Autoplay transition via `onEnded`
 - [x] Implement dual Playback Provider system:
@@ -47,18 +48,29 @@
 
 ## Phase 5: Client User Experience & Pages
 - [x] Home Page (`/`): Category chips, video feed cards with duration, views, relative timestamp, and channel avatar
-- [x] Watch Page (`/watch?v=...`): Player view, expandable description, channel info, subscribe/like actions, comments section, and related video suggestions (with client-side Next.js routing)
+- [x] Watch Page (`/watch?v=...`): Player view, expandable description, channel info, subscribe/like actions, comments section, and related video suggestions
 - [x] Search Page (`/search?q=...`): Rich result cards (videos, channels, playlists), filters, and sort options
 - [x] Channel Page (`/channel/[id]`): High-res channel avatar, responsive banner (up to 2560px), subscriber & video counters, About tab, and full video pagination
 - [x] Subscriptions Page (`/subscriptions`): Latest uploads feed from subscribed channels and channel quick-list with Google Sign-In prompt
 - [x] Library & History Page (`/history`, `/library`, `/liked`): Local and synced history with progress bar indicators, resume playback, and mobile-friendly clear/delete buttons
-- [x] Playlists Management (`/playlists`, `/playlist/[id]`): View, create, and manage playlists
+- [x] Complete Playlists Management:
+  - [x] Create, rename/edit (PUT), and delete playlists
+  - [x] Add and remove videos (via Watch page Save dialog and Playlist detail view)
+  - [x] View playlists with "YouTube Synced" vs "Local" badges and video counts
+  - [x] Play videos from playlist with active Playlist Queue panel and automated next-track playback transition on Watch page
+  - [x] Sync Google YouTube playlists when authenticated while preserving local guest playlists
+- [x] Real Comments & Replies System:
+  - [x] Display real comments with authors, avatars, like counts, and relative dates
+  - [x] Comments pagination / Load More Comments button
+  - [x] Expandable replies toggle ("View X replies") with real thread replies
+  - [x] Authenticated comment and reply submission via YouTube API with permission error handling
+  - [x] Handle videos with disabled comments gracefully
 - [x] Settings Page (`/settings`): Configure preferred playback provider, Google account connection status / sign-out, custom API key, theme preferences, and data clear options
-- [x] Header & Navigation: Full-width expandable mobile search, slide-out mobile drawer with backdrop, and interactive UserMenu (Google Sign-In modal & Sign-Out)
+- [x] Header & Navigation: Full-width expandable mobile search, slide-out mobile drawer with backdrop, and interactive UserMenu (Google Sign-In button & Sign-Out)
 - [x] Verify all routes, responsive mobile/tablet/desktop design, and navigation
 
 ## Phase 6: Verification, Polishing, Production Build & Handoff
 - [x] Run comprehensive production build (`pnpm build`) and fix any lint/type errors
-- [x] End-to-end flow verification (Home -> Search -> Watch -> Channel -> History -> Settings) across screen sizes
+- [x] End-to-end flow verification (Home -> Search -> Watch -> Channel -> History -> Playlists -> Settings) across screen sizes
 - [x] Verify security guidelines (no leaked secrets, sanitized inputs, safe token handling)
 - [x] Finalize `PHASES.md` and `PROGRESS.md` with complete handoff documentation

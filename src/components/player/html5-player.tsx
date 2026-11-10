@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { AlertCircle, Film, RefreshCw, ExternalLink } from "lucide-react";
+import { Film, RefreshCw, ExternalLink, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface HTML5PlayerProps {
@@ -43,23 +43,15 @@ export function HTML5Player({
         if (data.hasDirectStream && data.streamUrl) {
           setStreamUrl(data.streamUrl);
         } else {
-          // Whenever native direct playback is unsupported, automatically fall back to the official YouTube Player
-          if (onSwitchToEmbed) {
-            onSwitchToEmbed();
-          } else {
-            setStreamError(
-              "Direct stream is unavailable for this video. Use the YouTube Player for playback."
-            );
-          }
+          setStreamError(
+            data.message ||
+              "Direct stream is unavailable for this video due to YouTube cipher protection."
+          );
         }
       })
-      .catch((err) => {
+      .catch(() => {
         if (isCancelled) return;
-        if (onSwitchToEmbed) {
-          onSwitchToEmbed();
-        } else {
-          setStreamError("Unable to load video stream in native player.");
-        }
+        setStreamError("Unable to load video stream in native player.");
       })
       .finally(() => {
         if (!isCancelled) setLoading(false);
@@ -68,11 +60,11 @@ export function HTML5Player({
     return () => {
       isCancelled = true;
     };
-  }, [videoId, onSwitchToEmbed]);
+  }, [videoId]);
 
   // Set initial progress timestamp if resuming
   useEffect(() => {
-    if (videoRef.current && initialProgressSeconds > 0) {
+    if (videoRef.current && initialProgressSeconds > 0 && streamUrl) {
       videoRef.current.currentTime = initialProgressSeconds;
     }
   }, [streamUrl, initialProgressSeconds]);
@@ -99,6 +91,12 @@ export function HTML5Player({
     }
   };
 
+  const handleVideoError = () => {
+    setStreamError(
+      "Playback failed in native player. This stream may require official player codecs or signature decryption."
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex aspect-video w-full flex-col items-center justify-center rounded-2xl bg-black text-white gap-3 shadow-lg">
@@ -110,7 +108,7 @@ export function HTML5Player({
     );
   }
 
-  // Fallback notice if stream is unavailable in native mode
+  // Fallback notice if stream is unavailable or error in native mode
   if (!streamUrl || streamError) {
     return (
       <div className="relative flex aspect-video w-full flex-col items-center justify-center rounded-2xl bg-zinc-950 border border-zinc-800 p-6 text-center text-white shadow-xl overflow-hidden">
@@ -129,7 +127,8 @@ export function HTML5Player({
             Playback Available in Official Player
           </h3>
           <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-            Direct MP4 streaming is not provided by YouTube for this video. Switch to the Official YouTube Player for full video and audio playback.
+            {streamError ||
+              "Direct MP4 streaming is not provided by YouTube for this video. Switch to the Official YouTube Player for full video and audio playback."}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             {onSwitchToEmbed && (
@@ -139,7 +138,7 @@ export function HTML5Player({
                 onClick={onSwitchToEmbed}
                 className="gap-2 bg-red-600 hover:bg-red-700 text-white font-medium text-xs"
               >
-                <Film className="h-4 w-4" />
+                <Play className="h-4 w-4 fill-current" />
                 <span>Play in Official YouTube Player</span>
               </Button>
             )}
@@ -158,7 +157,7 @@ export function HTML5Player({
     );
   }
 
-  // Native HTML5 <video controls> Player - Default appearance and behavior
+  // Native HTML5 <video controls> Player - Default browser appearance and behavior
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-xl">
       <video
@@ -168,9 +167,7 @@ export function HTML5Player({
         controls
         autoPlay
         playsInline
-        onError={() => {
-          if (onSwitchToEmbed) onSwitchToEmbed();
-        }}
+        onError={handleVideoError}
         onEnded={onEnded}
         onTimeUpdate={handleTimeUpdate}
         className="h-full w-full object-contain"

@@ -6,14 +6,13 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import {
   User,
   LogOut,
-  LogIn,
   Sliders,
   History,
   ListVideo,
   ThumbsUp,
   ShieldCheck,
   CheckCircle2,
-  ExternalLink,
+  Tv,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -39,6 +38,15 @@ export function UserMenu() {
         });
       })
       .catch(() => {});
+
+    // Allow other components (e.g., Sidebar, Subscriptions, Comments) to trigger Sign-In
+    const handleOpenSignIn = () => {
+      handleSignIn();
+    };
+    window.addEventListener("trigger-google-signin", handleOpenSignIn);
+    return () => {
+      window.removeEventListener("trigger-google-signin", handleOpenSignIn);
+    };
   }, []);
 
   // Close menu on click outside
@@ -54,7 +62,7 @@ export function UserMenu() {
 
   const handleSignIn = async () => {
     if (!authStatus.configured) {
-      // Don't redirect to Google if client_id is not set
+      // Show clear setup guidance modal if credentials are missing
       setIsSignInModalOpen(true);
       return;
     }
@@ -124,6 +132,14 @@ export function UserMenu() {
             {/* Menu Links */}
             <div className="flex flex-col gap-1 py-2 border-b border-border text-xs font-medium">
               <Link
+                href="/subscriptions"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-accent transition-colors"
+              >
+                <Tv className="h-4 w-4 text-muted-foreground" />
+                <span>Subscriptions</span>
+              </Link>
+              <Link
                 href="/history"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-accent transition-colors"
@@ -173,22 +189,20 @@ export function UserMenu() {
     );
   }
 
-  // Unauthenticated / Guest State
+  // Unauthenticated / Guest State - Prominent YouTube-Style Sign In Button
   return (
     <>
       <Button
         variant="outline"
         size="sm"
-        onClick={() => setIsSignInModalOpen(true)}
-        className="gap-1.5 text-xs font-medium border-border/80 hover:border-primary/50 text-foreground"
+        onClick={handleSignIn}
+        className="rounded-full border-blue-500/80 text-blue-500 hover:bg-blue-500/10 hover:border-blue-500 font-semibold px-3 py-1 text-xs flex items-center gap-1.5 transition-all shrink-0"
       >
-        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs">
-          <User className="h-3.5 w-3.5 text-muted-foreground" />
-        </div>
-        <span className="hidden sm:inline">Sign In</span>
+        <User className="h-3.5 w-3.5" />
+        <span>Sign In</span>
       </Button>
 
-      {/* Sign In & Account Dialog Modal */}
+      {/* Sign In & Account Dialog Modal (Setup Guidance if credentials missing) */}
       {isSignInModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-2xl">
@@ -202,7 +216,7 @@ export function UserMenu() {
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold">Sign In to YouTube Web</h3>
+              <h3 className="text-lg font-bold">Sign In with Google</h3>
               <p className="text-xs text-muted-foreground pt-1.5 pb-5 leading-relaxed">
                 Connect your real Google account to access your live YouTube subscriptions, playlists, and synced history.
               </p>
@@ -242,12 +256,12 @@ export function UserMenu() {
                     <span>Google OAuth Setup Required</span>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
-                    Google OAuth credentials are not configured in your environment.
+                    Google OAuth credentials are not configured in your environment. Add these variables to enable Google sign-in:
                   </p>
                   <div className="rounded bg-black/40 p-2 font-mono text-[10px] text-zinc-300 space-y-1">
                     <div># Add to .env.local:</div>
                     <div className="text-amber-300">AUTH_GOOGLE_ID=your_client_id</div>
-                    <div className="text-amber-300">AUTH_GOOGLE_SECRET=your_secret</div>
+                    <div className="text-amber-300">AUTH_GOOGLE_SECRET=your_client_secret</div>
                   </div>
                   <div className="pt-2 text-[10px] text-muted-foreground">
                     Authorized redirect URI:
@@ -265,7 +279,7 @@ export function UserMenu() {
                   <span>Guest Mode is Active</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-normal">
-                  Your watch history, custom playlists, and liked videos are already persisted locally in your embedded PostgreSQL database.
+                  Your watch history, custom playlists, and liked videos are saved locally in your embedded PostgreSQL database.
                 </p>
               </div>
 

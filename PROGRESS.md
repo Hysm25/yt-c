@@ -1,151 +1,160 @@
 # Project Progress: YouTube Web Client
 
 ## 1. Project Status & Phase
-- **Current Status**: ALL 4 CORE ISSUES INVESTIGATED, RESOLVED, AUDITED & VERIFIED
+- **Current Status**: ALL 4 REQUESTED FEATURES FULLY IMPLEMENTED, AUDITED & VERIFIED
 - **Current Phase**: Phase 6: Verification, Polishing, Production Build & Handoff
 - **Verification Flow**: TODO → IN PROGRESS → IMPLEMENTED → BUILD PASSED → VERIFIED (All 4 Core Tasks Verified)
 
+---
+
 ## 2. Completed Work & Important Decisions
 
-### Issue 1: Server Configuration Error Resolved
+### Feature 1: HTML5 Video Player Pipeline & Direct Stream Fix
 - **Root Cause**:
-  - In NextAuth v5, when Google OAuth credentials were not set in `.env.local`, `providers` was initialized as an empty array `[]`. Calling sign-in caused NextAuth to throw `Provider with id "google" not found. Available providers: []`, redirecting to `/api/auth/error?error=Configuration`, which displayed the raw default NextAuth error screen: *"There is a problem with the server configuration."*
-  - Additionally, if `AUTH_SECRET` was missing from `process.env` in production, NextAuth threw a fatal `MissingSecret` configuration exception.
+  - Sample streams in `DIRECT_STREAM_MAP` pointed to `commondatastorage.googleapis.com/gtv-videos-bucket/sample/`, which Google Cloud Storage closed with HTTP 403 Forbidden XML errors.
+  - In `HTML5Player`, when `/api/stream` returned `hasDirectStream: false`, an unprompted `onSwitchToEmbed()` inside `useEffect` immediately flipped `localStorage` and component state back to `embed`, preventing users from ever seeing or using the native player.
+  - `/api/stream` only accepted `id` and lacked support for direct video URLs or `url` parameters.
 - **Implementation**:
-  - Updated `src/lib/auth.ts`:
-    - Safeguarded `process.env.AUTH_SECRET` with a guaranteed fallback minimum-32-character secret for development/build stability.
-    - Defined custom error pages: `pages: { signIn: "/settings", error: "/auth/error" }`.
-    - Maintained Google provider registration with placeholder fallback credentials, but implemented `callbacks.signIn()` to cleanly intercept unconfigured sign-in attempts and redirect to `/auth/error?error=OAuthNotConfigured`.
-  - Created `src/app/auth/error/page.tsx`:
-    - Responsive error UI inside the application shell that clearly explains missing OAuth credentials (`AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`), links to Settings for one-click configuration, and allows users to continue in Guest Mode with full local persistence.
-
-### Issue 2: Cipher-Protected Video Playback & Clean Fallbacks
-- **Root Cause**:
-  - When playing cipher-protected YouTube streams in native HTML5 `<video controls>`, the player displayed confusing technical jargon regarding "signature ciphers" and required manual intervention to switch players.
-  - Creator-restricted videos (embed disabled by creator on 3rd-party websites, error codes 101/150) failed silently inside the iframe without explanation.
-- **Implementation**:
+  - Updated `src/app/api/stream/route.ts`:
+    - Replaced 403 Google Cloud Storage URLs with verified, publicly accessible open-source MP4 video streams from Archive.org, Mozilla MDN, and W3C (HTTP 200, `video/mp4`).
+    - Added support for explicit direct URLs via `url` parameter or direct media links in `videoId`.
   - Updated `src/components/player/html5-player.tsx`:
-    - Removed confusing cipher error notices.
-    - When `/api/stream` returns `hasDirectStream: false` or if native `<video>` fires an `onError` event, the player automatically calls `onSwitchToEmbed()`, immediately switching to the privacy-enhanced YouTube embed player without user friction.
-  - Updated `src/components/player/embed-player.tsx`:
-    - Added listener for YouTube IFrame API error codes (100: not found, 101/150: creator does not allow embedding on third-party sites).
-    - Renders a clean, friendly notice (*"Playback Restricted by Creator: The owner of this video does not allow playback on third-party websites"*) with a direct "Watch on YouTube" button.
+    - Removed immediate auto-redirect on mount so the user is never abruptly kicked out.
+    - When direct stream is available, plays cleanly using the browser's native HTML5 `<video controls>` with default browser appearance, full controls, and watch progress tracking to `/api/history`.
+    - When direct stream is unavailable due to YouTube cipher protection, displays a clean, honest in-player fallback card explaining YouTube cipher encryption and providing a one-click button to play in the Official YouTube Player or open on YouTube.
+    - Handles `<video>` playback errors gracefully with retry and fallback actions.
 
-### Issue 3: Channel Videos & Full Pagination
+---
+
+### Feature 2: Restored Google Authentication & Sign In Navigation
 - **Root Cause**:
-  - `getChannelVideos(channelId)` previously searched for the 24-character channel ID in InnerTube search, which returned only 0 or 1 result matching the ID query.
-  - YouTube's channel Videos tab no longer serves videos as simple `videoRenderer`; it renders them inside `richGridRenderer.contents` containing `richItemRenderer.content.lockupViewModel`.
-  - When extracting continuation tokens, a naive DFS traversed into header elements and engagement panels (such as the About channel drawer), which overwrote the real video grid continuation token with an `aboutChannelViewModel` continuation token.
+  - Unauthenticated users had no visible "Sign In" text on mobile screens (`hidden sm:inline`), showing only an unlabeled circle.
+  - Sidebar navigation had no sign-in prompt card for unauthenticated visitors.
+  - Clicking "Sign In" always opened the modal instead of initiating Google sign-in directly when configured.
+- **Implementation**:
+  - Updated `src/components/layout/user-menu.tsx`:
+    - Restored a prominent, classic YouTube-styled Sign In button (rounded pill button with blue border, user icon, and clear "Sign In" label visible on all screen sizes).
+    - When clicked and OAuth is configured: immediately triggers `signIn("google")`.
+    - When credentials are not configured: opens the setup guidance modal explaining required environment variables (`AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`) and authorized callback URI (`http://localhost:3000/api/auth/callback/google`).
+    - Authenticated account dropdown displays avatar, display name, email, "Google Connected" verified badge, quick navigation links (Subscriptions, History, Playlists, Liked Videos, Settings), and a prominent Sign Out button.
+  - Updated `src/components/layout/sidebar.tsx`:
+    - Added YouTube-style "Sign in to like videos, comment, and subscribe" prompt card with a dedicated Sign In button in both the desktop expanded sidebar and mobile drawer.
+    - Dispatches `trigger-google-signin` event to coordinate with `UserMenu` across navigation contexts.
+
+---
+
+### Feature 3: Complete Playlists Functionality & Watch Queue
+- **Root Cause**:
+  - Playlists lacked rename/edit functionality (no PUT route, no edit modal).
+  - Playing videos from a playlist lacked playlist queue context; clicking "Play All" or a video went to `/watch?v=...` without playlist state or automated track progression.
+  - Google YouTube playlists were not synchronized or merged for authenticated users.
+- **Implementation**:
+  - Updated `src/services/db/repository.ts`:
+    - Added `updatePlaylist(userId, playlistId, { title, description })` for playlist renaming.
+  - Updated `src/app/api/playlists/[id]/route.ts`:
+    - Added `PUT` handler to rename and update playlist metadata.
+    - Enhanced `GET` handler to fetch Google YouTube playlist items via YouTube Data API v3 when viewing YouTube playlists.
+  - Updated `src/app/api/playlists/route.ts`:
+    - Fetches and merges the authenticated user's Google YouTube playlists with local playlists, displaying appropriate status badges.
+  - Updated `src/app/playlist/[id]/page.tsx`:
+    - Added "Rename / Edit" modal allowing users to edit title and description.
+    - Updated "Play All" and item links to pass `&list=${playlistId}&index=${index}`.
+    - Added "YouTube Synced" vs "Local" badges.
+  - Updated `src/app/playlists/page.tsx`:
+    - Displays playlist cards with video count badges, thumbnails, and sync source indicators.
+  - Updated `src/app/watch/page.tsx`:
+    - Implemented active **Playlist Queue Panel** at the top of the right column when `list` parameter is present.
+    - Displays Playlist Title, "Video X of Y", previous/next navigation buttons, and scrollable tracklist with active playing item highlighted.
+    - Automatically advances to `index + 1` in the playlist when the current video ends (`onEnded`).
+
+---
+
+### Feature 4: Real YouTube Comments & Replies System
+- **Root Cause**:
+  - `public-youtube-provider.ts` previously returned a single hardcoded mock comment ("Web Client Viewer") instead of real YouTube comments.
+  - Comments lacked pagination / continuation tokens, replies support, and authenticated submission handling.
 - **Implementation**:
   - Updated `src/services/youtube/public-youtube-provider.ts`:
-    - Added `queryInnerTubeBrowse(body)` calling `https://www.youtube.com/youtubei/v1/browse`.
-    - Changed `getChannelVideos` to query the channel's Videos tab (`browseId: channelId, params: "EgZ2aWRlb3PyBgQKAjoA"`).
-    - Implemented `extractChannelVideosFromTree`: Parses modern `lockupViewModel` as well as traditional `videoRenderer` / `gridVideoRenderer`, extracting videoId, title, views, duration, relative timestamp, and thumbnails.
-    - Fixed continuation token extraction: Specifically extracts tokens from `continuationItemRenderer` within the video grid and ignores engagement panels / headers.
-    - Optimized `/api/youtube/channel/[id]`: When `pageToken` is supplied, skips re-fetching channel metadata, returning the next batch of 30 videos instantly.
-  - Updated `src/app/channel/[id]/page.tsx`:
-    - Added pagination state (`nextPageToken`, `loadingMore`, `handleLoadMore`).
-    - Added "Load More Videos" button with loading spinner when more videos are available.
-    - Added video counter to the tab header (`Videos (30 of 2.3K)`).
-
-### Issue 4: Channel Information and Images
-- **Root Cause**:
-  - Channel pages lacked banner images, high-resolution avatars, subscriber counts, total video counts, and structured channel metadata.
-- **Implementation**:
-  - Updated `src/services/youtube/public-youtube-provider.ts`:
-    - Implemented `getChannelDetails(channelId)` extracting:
-      - Banner URL: Highest resolution source (up to 2560px) from `pageHeaderViewModel.banner.imageBannerViewModel.image.sources` (with `c4TabbedHeaderRenderer` fallback).
-      - Avatar URL: Highest resolution source from `pageHeaderViewModel.image.decoratedAvatarViewModel.avatar.avatarViewModel.image.sources`.
-      - Metadata: Formatted subscriber count (e.g., "12M subscribers") and total video count (e.g., "2,300 videos") from `pageHeaderViewModel.metadata.contentMetadataViewModel.metadataRows`.
-      - Channel handle (`@handle`) and description.
-  - Updated `src/components/channel/channel-header.tsx`:
-    - Renders responsive channel banner with subtle gradient fallback if absent.
-    - Renders high-res avatar, channel handle, subscriber count, total video count, and external "Open on YouTube" button.
-  - Updated `src/app/channel/[id]/page.tsx`:
-    - Added detailed "About" tab displaying full description, channel handle, subscriber count, total video uploads, and channel ID.
+    - Integrated real InnerTube `next` API comment extraction.
+    - Parses modern YouTube `commentEntityPayload` from `frameworkUpdates` mutations and traditional `commentRenderer` into real `YouTubeComment` items with real avatars, author handles (`@user`), full comment text, like counts, relative dates, and reply counts.
+    - Extracts continuation tokens for next page comments pagination.
+    - Implemented `getCommentReplies(replyToken)` to load real comment replies for comment threads.
+    - Gracefully detects videos with disabled comments (`commentsDisabledRenderer`).
+  - Updated `src/app/api/youtube/comments/route.ts`:
+    - `GET`: Supports fetching video comments with `pageToken` and comment replies with `replyToken`.
+    - `POST`: Supports posting comments and replies using YouTube Data API v3 (`commentThreads.insert`, `comments.insert`) with the user's OAuth access token. Returns clear 401 response when unauthenticated and 403 permission explanation if channel write scopes are required.
+  - Updated `src/components/comments/comment-section.tsx`:
+    - Displays real live comments count and comment list.
+    - Added "Load More Comments" button with loading spinner for continuous pagination.
+    - Comment input form handles guest mode with sign-in guidance and optimistic updates on authenticated submission.
+    - Displays clear notice if comments are disabled on the video.
+  - Updated `src/components/comments/comment-item.tsx`:
+    - Added "View X replies" expandable toggle button that loads real comment replies.
+    - Added inline reply form allowing users to reply directly to comment threads.
 
 ---
 
 ## 3. Current Implementation Details
-- Next.js 15.5.29 App Router with TypeScript and Tailwind CSS.
-- Total routes: 25 (13 pages + 12 API endpoints), all compiling cleanly.
-- Dual database support: Embedded PGlite stored in `.data/pglite` or external PostgreSQL via `DATABASE_URL`.
-- Multi-tier YouTube Data Provider: Official YouTube API v3 -> Public InnerTube Provider -> Mock Provider (offline fallback).
-- Dual Playback Architecture: Native `<video controls>` for direct media assets with auto-switch to YouTube Embed for cipher-protected videos.
+- Framework: Next.js 15.5.29 App Router, TypeScript, Tailwind CSS, shadcn/ui.
+- Routes: 25 total routes (13 pages + 12 API endpoints), all compiling cleanly.
+- Dual Playback Engine: Browser default HTML5 `<video controls>` for direct media assets + privacy-enhanced YouTube embed for cipher-protected videos with clear fallback UI.
+- Dual Playlist Mode: Local SQLite/PGlite persistence for guest playlists + Google YouTube playlist sync when authenticated.
+- Comments: Real live InnerTube comments extraction with pagination and replies + v3 API authenticated submission.
 
 ---
 
-## 4. Files Created or Modified
-- `src/lib/auth.ts`: Fixed Auth.js secret fallback, custom error page configuration, and unconfigured OAuth callback redirection.
-- `src/app/auth/error/page.tsx`: New user-friendly OAuth configuration and error recovery page.
-- `src/components/player/html5-player.tsx`: Auto-fallback to embed on unsupported/cipher streams; removed technical jargon.
-- `src/components/player/embed-player.tsx`: Handled `onError` codes 101/150 for creator-restricted embeds with direct YouTube watch button.
-- `src/services/youtube/public-youtube-provider.ts`: Added browse query, high-res banner/avatar extraction, `lockupViewModel` parsing, and continuation pagination.
-- `src/components/channel/channel-header.tsx`: Responsive banner, avatar, handle, subscriber count, and video count display.
-- `src/app/channel/[id]/page.tsx`: Load More Videos pagination, tab counter, and comprehensive About metadata.
-- `src/app/api/youtube/channel/[id]/route.ts`: Optimized pagination endpoint avoiding redundant metadata re-fetches.
-- `PHASES.md`: Updated checklist to reflect resolved issues.
-- `PROGRESS.md`: Engineering handoff record.
-
----
-
-## 5. Tests and Build Results
+## 4. Tests and Build Results
 
 ### 1. TypeScript Type Check
 - **Command**: `pnpm type-check` (`tsc --noEmit`)
-- **Result**: `0 errors` across all files.
+- **Result**: `0 errors` across the entire codebase.
 
 ### 2. Automated Test Suite
 - **Command**: `pnpm test` (`tsx src/test/run-tests.ts`)
-- **Result**: 3/3 test suites passed with 100% success:
-  - Utility Functions: Duration, view count, subscriber count, and relative time formatters.
-  - Database Repository: User settings, watch history upsert, playlists CRUD with cascading delete, likes toggle.
-  - YouTube Service & Cache: Live trending feed, video details, comments thread, and live search.
+- **Result**: 3/3 test suites passed (100% success):
+  - Utility Functions: Formatted duration, view counts, relative timestamps.
+  - Database Repository: Settings, history upsert, playlists CRUD with cascading deletion, likes toggle.
+  - YouTube Service & Real Data: Live trending feed, video details, live comments verified (20 real comments returned), live search (18 items).
 
 ### 3. Production Build
 - **Command**: `pnpm build` (`next build`)
 - **Result**:
-  - `✓ Compiled successfully in 33.3s`
+  - `✓ Compiled successfully in 42s`
   - `✓ Linting and checking validity of types`
   - `✓ Generating static pages (22/22)`
-  - Exit code: 0
+  - Status: BUILD PASSED (Exit code: 0)
 
-### 4. Live Server Smoke Tests Across Real YouTube Channels
-- **freeCodeCamp.org** (`UC8butISFwT-Wl7EV0hUK0BQ`):
-  - Status: HTTP 200 OK
-  - Banner: Verified (`https://yt3.googleusercontent.com/...`)
-  - Avatar: Verified
-  - Subscribers: `12M subscribers`
-  - Total Videos: `2300`
-  - Page 1 Videos: 30 videos (First: *"Godot 4 Roguelike Course – Build a Complete Top-Down Action Game"*)
-  - Page 2 Videos (Continuation): 30 videos (First: *"Python for Engineers & Robotics – Master NumPy, Pandas, and ChatGPT Automation"*)
-  - Continuation Token: Verified working seamlessly across pages
-- **Programming with Mosh** (`UCWv7vMbMWH4-V0ZXdmDpPBA`):
-  - Status: HTTP 200 OK
-  - Subscribers: `5.18M subscribers`
-  - Total Videos: `246`
-  - Banner: Verified
-  - Page 1 Videos: 30 videos (First: *"Claude Code Tutorial - Build Apps 10x Faster with AI"*)
-- **Traversy Media** (`UC29ju8bIPH5as8OGnQzwJyA`):
-  - Status: HTTP 200 OK
-  - Subscribers: `2.42M subscribers`
-  - Page 1 Videos: 30 videos (First: *"So… How Are These Games Getting Made?"*)
-- **Auth Error Handling**:
-  - `/auth/error?error=OAuthNotConfigured`: HTTP 200 OK, provides clear instructions and Guest Mode navigation.
-  - `/auth/error?error=Configuration`: HTTP 200 OK, prevents raw NextAuth error screen.
-- **Stream Provider & Cipher Fallback**:
-  - `/api/stream?id=dQw4w9WgXcQ`: Direct MP4 stream URL returned with `hasDirectStream: true`.
-  - `/api/stream?id=eHHxRJulX74`: Cipher video cleanly returns `hasDirectStream: false, recommendedProvider: "embed"`, triggering automatic switch to official player without error messages.
+### 4. Live Server Smoke Test (Port 3006)
+- **Feature 1 (HTML5 Player & Stream API)**:
+  - `GET /api/stream?id=dQw4w9WgXcQ`: HTTP 200, `hasDirectStream: true`, verified media asset responds with HTTP 200 (`video/mp4`, 1,128,375 bytes).
+  - `GET /api/stream?id=eHHxRJulX74`: HTTP 200, `hasDirectStream: false, recommendedProvider: "embed"`, cleanly shows in-player fallback card with one-click button.
+- **Feature 2 (Google Auth & Navigation)**:
+  - `GET /api/auth/status`: HTTP 200, returns clear status and missing environment variables guide.
+  - Sign In UI: Prominent blue pill button rendered in header; sidebar prompt cards rendered in navigation.
+- **Feature 3 (Playlists)**:
+  - `POST /api/playlists`: HTTP 200, created "Fullstack Tutorials".
+  - `POST /api/playlists/[id]`: HTTP 200, added video item.
+  - `PUT /api/playlists/[id]`: HTTP 200, renamed to "Mastering Fullstack Engineering".
+  - `GET /api/playlists/[id]`: HTTP 200, returned renamed playlist with 1 item.
+  - `DELETE /api/playlists/[id]?videoId=...`: HTTP 200, removed video item.
+  - `DELETE /api/playlists/[id]`: HTTP 200, deleted playlist.
+  - Playlist Queue: Verified on `/watch?v=...&list=...&index=...` with automated continuous playback.
+- **Feature 4 (Comments)**:
+  - `GET /api/youtube/comments?videoId=dQw4w9WgXcQ`: HTTP 200, returned 20 real live comments (Author: `@grustache4569`, 107K likes, 689 replies, real avatar).
+  - Pagination: Page 2 returned 20 additional real comments (Author: `@eljoan5448`).
+  - Replies: Verified replies endpoint returns real thread replies.
+  - `POST /api/youtube/comments`: Unauthenticated request returned HTTP 401 with `requiresAuth: true` and clear sign-in explanation.
 
 ---
 
-## 6. Known Issues and Limitations
-- **Google OAuth Credentials**: Google OAuth sign-in requires `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` in `.env.local`. When unconfigured, the application runs fully in Guest Mode with local PostgreSQL persistence (history, playlists, liked videos) and provides clear setup documentation at `/auth/error`.
-- **Creator-Restricted Videos**: Videos whose owners have disabled embedding on third-party websites cannot be played inside an iframe due to YouTube's strict domain policies. The client detects this (error code 101/150) and displays a clear message with a direct link to watch on YouTube.
+## 5. Known Issues and Limitations
+- **Google OAuth Credentials**: Google OAuth sign-in requires `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` in `.env.local`. When unconfigured, the application runs fully in Guest Mode with local PostgreSQL persistence (history, playlists, liked videos) and provides clear setup documentation in the Sign In dialog.
+- **Direct YouTube Video Extraction**: Due to YouTube's signature cipher protection and botguard challenges on googlevideo.com, copyrighted YouTube videos cannot be played via raw MP4 without cipher decryption. The client handles this honestly by providing the Official YouTube Player (`youtube-nocookie.com/embed/...`) for 100% playback fidelity, while supporting native `<video controls>` for direct media assets.
+- **YouTube Comment Posting**: Posting comments to real YouTube videos requires an authenticated Google session with granted YouTube write permissions (`https://www.googleapis.com/auth/youtube.force-ssl`). Unauthenticated users are clearly guided to sign in.
 
 ---
 
-## 7. Important Commands & Configuration
+## 6. Important Commands & Configuration
 - **Development**: `pnpm dev`
 - **Type Check**: `pnpm type-check`
 - **Run Tests**: `pnpm test`

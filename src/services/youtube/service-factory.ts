@@ -121,6 +121,10 @@ class YouTubeService {
     );
   }
 
+  async getCommentReplies(replyToken: string) {
+    return await this.publicProvider.getCommentReplies(replyToken);
+  }
+
   async getUserSubscriptions(accessToken?: string, pageToken?: string) {
     if (accessToken) {
       try {
@@ -143,6 +147,17 @@ class YouTubeService {
       }
     }
     return await this.mockProvider.getUserPlaylists();
+  }
+
+  async getPlaylistItems(playlistId: string, accessToken?: string) {
+    try {
+      const apiKey = process.env.YOUTUBE_API_KEY || "";
+      const provider = new OfficialYouTubeApiProvider(apiKey);
+      return await provider.getPlaylistItems(playlistId, accessToken);
+    } catch (err: any) {
+      console.warn("Failed to fetch playlist items from YouTube:", err.message);
+    }
+    return { items: [] };
   }
 }
 

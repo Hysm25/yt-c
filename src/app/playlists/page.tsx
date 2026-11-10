@@ -2,13 +2,18 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { ListVideo, Plus } from "lucide-react";
+import { ListVideo, Plus, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface PlaylistMeta {
   id: string;
   title: string;
   description: string;
+  thumbnailUrl?: string;
+  itemCount?: number;
+  isYouTube?: boolean;
+  source?: "local" | "youtube";
   createdAt: string;
   updatedAt: string;
 }
@@ -105,11 +110,38 @@ export default function PlaylistsPage() {
             <Link
               key={pl.id}
               href={`/playlist/${pl.id}`}
-              className="group flex flex-col rounded-2xl border bg-secondary/30 p-4 hover:bg-secondary/60 transition-all shadow-xs"
+              className="group flex flex-col rounded-2xl border bg-secondary/30 p-4 hover:bg-secondary/60 transition-all shadow-xs overflow-hidden"
             >
-              <div className="flex aspect-video w-full items-center justify-center rounded-xl bg-secondary mb-3 group-hover:scale-102 transition-transform">
-                <ListVideo className="h-10 w-10 text-muted-foreground group-hover:text-red-500 transition-colors" />
+              <div className="relative flex aspect-video w-full items-center justify-center rounded-xl bg-secondary mb-3 overflow-hidden group-hover:scale-102 transition-transform">
+                {pl.thumbnailUrl ? (
+                  <img
+                    src={pl.thumbnailUrl}
+                    alt={pl.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <ListVideo className="h-10 w-10 text-muted-foreground group-hover:text-red-500 transition-colors" />
+                )}
+                {pl.itemCount !== undefined && (
+                  <div className="absolute bottom-1.5 right-1.5">
+                    <Badge variant="duration">{pl.itemCount} videos</Badge>
+                  </div>
+                )}
               </div>
+
+              <div className="flex items-center gap-1.5 mb-1">
+                {pl.isYouTube ? (
+                  <Badge variant="secondary" className="gap-1 text-[10px] bg-red-500/10 text-red-500 border-red-500/20">
+                    <ShieldCheck className="h-3 w-3" />
+                    <span>YouTube Synced</span>
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px]">
+                    <span>Local</span>
+                  </Badge>
+                )}
+              </div>
+
               <h3 className="font-semibold text-sm truncate group-hover:text-red-500 transition-colors">
                 {pl.title}
               </h3>

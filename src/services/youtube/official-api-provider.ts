@@ -369,4 +369,30 @@ export class OfficialYouTubeApiProvider implements IYouTubeDataProvider {
       nextPageToken: data.nextPageToken,
     };
   }
+
+  async getPlaylistItems(
+    playlistId: string,
+    accessToken?: string
+  ): Promise<{ items: any[]; title?: string; description?: string }> {
+    const params: Record<string, string> = {
+      part: "snippet,contentDetails",
+      playlistId,
+      maxResults: "50",
+    };
+    const data = await this.fetchApi("playlistItems", params, accessToken);
+    const items = (data.items || []).map((item: any, index: number) => ({
+      id: item.id,
+      playlistId,
+      videoId: item.snippet?.resourceId?.videoId || item.contentDetails?.videoId,
+      title: item.snippet?.title || "Video",
+      channelTitle: item.snippet?.videoOwnerChannelTitle || item.snippet?.channelTitle || "Creator",
+      channelId: item.snippet?.videoOwnerChannelId || "",
+      thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || `https://i.ytimg.com/vi/${item.snippet?.resourceId?.videoId}/hqdefault.jpg`,
+      duration: 0,
+      position: index,
+      addedAt: item.snippet?.publishedAt || new Date().toISOString(),
+    }));
+
+    return { items };
+  }
 }

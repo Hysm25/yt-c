@@ -2,23 +2,54 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  ListVideo,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  RotateCcw,
+} from "lucide-react";
 import { YouTubeVideo, YouTubeChannel } from "@/services/youtube/types";
 import { VideoPlayer } from "@/components/player/video-player";
 import { VideoInfo } from "@/components/video/video-info";
 import { CommentSection } from "@/components/comments/comment-section";
 import { VideoCard } from "@/components/video/video-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { formatDuration } from "@/lib/utils";
 
 function WatchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const videoId = searchParams.get("v") || "dQw4w9WgXcQ";
+  const listId = searchParams.get("list");
+  const rawIndex = parseInt(searchParams.get("index") || "0", 10);
+  const currentIndex = isNaN(rawIndex) ? 0 : rawIndex;
 
   const [video, setVideo] = useState<YouTubeVideo | null>(null);
   const [channel, setChannel] = useState<YouTubeChannel | null>(null);
   const [relatedVideos, setRelatedVideos] = useState<YouTubeVideo[]>([]);
   const [initialProgress, setInitialProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Playlist State
+  const [playlist, setPlaylist] = useState<any | null>(null);
+
+  // Load playlist if list parameter exists
+  useEffect(() => {
+    if (!listId) {
+      setPlaylist(null);
+      return;
+    }
+
+    fetch(`/api/playlists/${encodeURIComponent(listId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.playlist) setPlaylist(data.playlist);
+      })
+      .catch((err) => console.warn("Failed to load playlist queue:", err));
+  }, [listId]);
 
   // Load video details, related videos, and saved watch progress
   useEffect(() => {
@@ -65,9 +96,35 @@ function WatchPageContent() {
     };
   }, [videoId]);
 
+  // Automated progression to next video (playlist or related)
   const handleNextVideo = () => {
+    if (playlist?.items && playlist.items.length > 0) {
+      const nextIdx = currentIndex + 1;
+      if (nextIdx < playlist.items.length) {
+        const nextItem = playlist.items[nextIdx];
+        router.push(
+          `/watch?v=${encodeURIComponent(nextItem.videoId)}&list=${encodeURIComponent(
+            listId!
+          )}&index=${nextIdx}`
+        );
+        return;
+      }
+    }
+
     if (relatedVideos.length > 0) {
       router.push(`/watch?v=${relatedVideos[0].id}`);
+    }
+  };
+
+  const handlePrevVideo = () => {
+    if (playlist?.items && currentIndex > 0) {
+      const prevIdx = currentIndex - 1;
+      const prevItem = playlist.items[prevIdx];
+      router.push(
+        `/watch?v=${encodeURIComponent(prevItem.videoId)}&list=${encodeURIComponent(
+          listId!
+        )}&index=${prevIdx}`
+      );
     }
   };
 
@@ -119,9 +176,102 @@ function WatchPageContent() {
         />
       </div>
 
-      {/* Right Column: Up Next / Related Videos */}
-      <div className="flex flex-col gap-3 px-3 sm:px-0 pb-12 sm:pb-0">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground px-1 pb-1">
+      {/* Right Column: Playlist Queue (if active) & Related Videos */}
+      <div className="flex flex-col gap-4 px-3 sm:px-0 pb-12 sm:pb-0">
+        {/* Active Playlist Queue Box */}
+        {playlist && playlist.items && playlist.items.length > 0 && (
+          <div className="flex flex-col rounded-2xl border border-border bg-card/80 overflow-hidden shadow-sm">
+            {/* Playlist Header */}
+            <div className="flex items-center justify-between p-3.5 bg-secondary/50 border-b">
+              <div className="flex flex-col overflow-hidden">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground truncate">
+                  <ListVideo className="h-4 w-4 text-red-500 shrink-0" />
+                  <span className="truncate">{playlist.title}</span>
+                </div>
+                <span className="text-[11px] text-muted-foreground pt-0.5">
+                  {currentIndex + 1} / {playlist.items.length} videos
+                </span>
+              </div>
+
+              {/* Prev / Next controls */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handlePrevVideo}
+                  disabled={currentIndex === 0}
+                  className="p-1 rounded-md hover:bg-accent disabled:opacity-40 transition-colors text-foreground"
+                  title="Previous video in playlist"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextVideo}
+                  disabled={currentIndex >= playlist.items.length - 1}
+                  className="p-1 rounded-md hover:bg-accent disabled:opacity-40 transition-colors text-foreground"
+                  title="Next video in playlist"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Tracklist */}
+            <div className="flex flex-col max-h-80 overflow-y-auto divide-y divide-border/30 p-1">
+              {playlist.items.map((item: any, idx: number) => {
+                const isActive = item.videoId === videoId || idx === currentIndex;
+                const thumb =
+                  item.thumbnailUrl ||
+                  `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
+
+                return (
+                  <Link
+                    key={item.id || item.videoId || idx}
+                    href={`/watch?v=${encodeURIComponent(
+                      item.videoId
+                    )}&list=${encodeURIComponent(listId!)}&index=${idx}`}
+                    className={`flex items-center gap-2.5 p-2 rounded-xl transition-colors ${
+                      isActive
+                        ? "bg-secondary/90 font-medium border-l-3 border-red-500"
+                        : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span className="text-[11px] font-mono w-4 text-center shrink-0">
+                      {isActive ? <Play className="h-3 w-3 fill-red-500 text-red-500" /> : idx + 1}
+                    </span>
+
+                    <div className="relative aspect-video w-20 shrink-0 overflow-hidden rounded-md bg-muted">
+                      <img
+                        src={thumb}
+                        alt={item.title}
+                        className="h-full w-full object-cover"
+                      />
+                      {item.duration > 0 && (
+                        <div className="absolute bottom-0.5 right-0.5">
+                          <span className="rounded bg-black/80 px-1 py-0.2 text-[9px] text-white">
+                            {formatDuration(item.duration)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col overflow-hidden text-xs">
+                      <span className={`line-clamp-1 ${isActive ? "text-foreground font-semibold" : ""}`}>
+                        {item.title}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground truncate pt-0.5">
+                        {item.channelTitle}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Related Videos */}
+        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground px-1">
           Related Videos
         </h3>
         <div className="flex flex-col gap-3">
@@ -136,7 +286,13 @@ function WatchPageContent() {
 
 export default function WatchPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading player...</div>}>
+    <Suspense
+      fallback={
+        <div className="p-8 text-center text-muted-foreground">
+          Loading player...
+        </div>
+      }
+    >
       <WatchPageContent />
     </Suspense>
   );

@@ -151,6 +151,23 @@ export const repository = {
     return newPlaylist;
   },
 
+  async updatePlaylist(
+    userId: string,
+    playlistId: string,
+    data: { title?: string; description?: string }
+  ) {
+    const updateData: any = { updatedAt: new Date() };
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.description !== undefined) updateData.description = data.description;
+
+    await db
+      .update(playlists)
+      .set(updateData)
+      .where(and(eq(playlists.userId, userId), eq(playlists.id, playlistId)));
+
+    return await this.getPlaylistWithItems(playlistId);
+  },
+
   async deletePlaylist(userId: string, playlistId: string) {
     // Delete playlist items first to ensure cleanliness
     await db

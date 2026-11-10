@@ -854,26 +854,236 @@ export class PublicYouTubeDataProvider implements IYouTubeDataProvider {
   }
 
   /**
-   * Initial comments
+   * Helper to query InnerTube Next endpoint (comments, related items)
+   */
+  private async queryInnerTubeNext(body: Record<string, any>) {
+    const payload = {
+      context: {
+        client: {
+          clientName: "WEB",
+          clientVersion: "2.20240410.01.00",
+          hl: "en",
+          gl: "US",
+          utcOffsetMinutes: 0,
+        },
+      },
+      ...body,
+    };
+
+    const res = await fetch(
+      "https://www.youtube.com/youtubei/v1/next?prettyPrint=false",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`InnerTube next failed with HTTP ${res.status}`);
+    }
+
+    return await res.json();
+  }
+
+  /**
+   * Get real video comments with full pagination and modern entity extraction
    */
   async getVideoComments(
     videoId: string,
     pageToken?: string
-  ): Promise<{ comments: YouTubeComment[]; nextPageToken?: string }> {
-    return {
-      comments: [
-        {
-          id: `comment-public-1-${videoId}`,
-          authorDisplayName: "Web Client Viewer",
-          authorProfileImageUrl:
-            "https://yt3.ggpht.com/ytc/AIdro_viewer=s176-c-k-c0x00ffffff-no-rj",
-          textDisplay: "Great video! Watching via YouTube Web Client.",
-          likeCount: 24,
-          publishedAt: "1 day ago",
-          replyCount: 0,
-        },
-      ],
-    };
+  ): Promise<{
+    comments: YouTubeComment[];
+    nextPageToken?: string;
+    commentsDisabled?: boolean;
+  }> {
+    try {
+      let continuationToken = pageToken;
+
+      // If no pageToken provided, fetch /next for videoId to resolve initial comments token
+      if (!continuationToken) {
+        const nextData = await this.queryInnerTubeNext({ videoId });
+
+        let isDisabled = false;
+        const findCommentsSection = (curr: any) => {
+          if (!curr || typeof curr !== "object") return;
+          if (curr.commentsDisabledRenderer) {
+            isDisabled = true;
+            return;
+          }
+          if (curr.itemSectionRenderer?.targetId === "comments-section") {
+            const continuation = curr.itemSectionRenderer.contents?.find(
+              (c: any) => c.continuationItemRenderer
+            );
+            if (
+              continuation?.continuationItemRenderer?.continuationEndpoint
+                ?.continuationCommand?.token
+            ) {
+              continuationToken =
+                continuation.continuationItemRenderer.continuationEndpoint
+                  .continuationCommand.token;
+              return;
+            }
+          }
+          for (const k of Object.keys(curr)) {
+            if (!continuationToken && !isDisabled) findCommentsSection(curr[k]);
+          }
+        };
+
+        findCommentsSection(nextData);
+
+        if (isDisabled) {
+          return { comments: [], commentsDisabled: true };
+        }
+      }
+
+      if (!continuationToken) {
+        return { comments: [] };
+      }
+
+      const data = await this.queryInnerTubeNext({
+        continuation: continuationToken,
+      });
+
+      const comments: YouTubeComment[] = [];
+      const seenIds = new Set<string>();
+      let nextPageToken: string | undefined = undefined;
+
+      // 1. Extract from frameworkUpdates mutations (modern YouTube format)
+      const mutations =
+        data.frameworkUpdates?.entityBatchUpdate?.mutations || [];
+      for (const m of mutations) {
+        const cep = m.payload?.commentEntityPayload;
+        if (
+          cep &&
+          cep.properties?.commentId &&
+          !seenIds.has(cep.properties.commentId)
+        ) {
+          seenIds.add(cep.properties.commentId);
+          const rawLikes =
+            cep.toolbar?.likeCountNotliked || cep.toolbar?.likeCountLiked || "0";
+          const rawReplies = cep.toolbar?.replyCount || "0";
+          comments.push({
+            id: cep.properties.commentId,
+            authorDisplayName: cep.author?.displayName || "Viewer",
+            authorProfileImageUrl:
+              cep.author?.avatarThumbnailUrl ||
+              "https://yt3.ggpht.com/default=s88-c-k-c0x00ffffff-no-rj",
+            textDisplay: cep.properties?.content?.content || "",
+            likeCount: this.parseViewCount(rawLikes),
+            publishedAt: cep.properties?.publishedTime || "Recently",
+            replyCount: parseInt(rawReplies.replace(/[^0-9]/g, ""), 10) || 0,
+          });
+        }
+      }
+
+      // 2. Fallback to traditional walk & extract next page continuation
+      const walk = (curr: any) => {
+        if (!curr || typeof curr !== "object") return;
+
+        const cr = curr.commentRenderer;
+        if (cr && cr.commentId && !seenIds.has(cr.commentId)) {
+          seenIds.add(cr.commentId);
+          const text =
+            cr.contentText?.runs?.map((r: any) => r.text).join("") ||
+            cr.contentText?.simpleText ||
+            "";
+          comments.push({
+            id: cr.commentId,
+            authorDisplayName:
+              cr.authorText?.simpleText ||
+              cr.authorText?.runs?.[0]?.text ||
+              "Viewer",
+            authorProfileImageUrl:
+              cr.authorThumbnail?.thumbnails?.[0]?.url ||
+              "https://yt3.ggpht.com/default=s88-c-k-c0x00ffffff-no-rj",
+            textDisplay: text,
+            likeCount: cr.likeCount || 0,
+            publishedAt:
+              cr.publishedTimeText?.runs?.[0]?.text ||
+              cr.publishedTimeText?.simpleText ||
+              "Recently",
+            replyCount: cr.replyCount || 0,
+          });
+        }
+
+        // Pagination continuation token
+        if (
+          curr.continuationItemRenderer?.continuationEndpoint
+            ?.continuationCommand?.token
+        ) {
+          const token =
+            curr.continuationItemRenderer.continuationEndpoint
+              .continuationCommand.token;
+          if (
+            !curr.trigger ||
+            curr.trigger !== "CONTINUATION_TRIGGER_ON_ITEM_SHOWN"
+          ) {
+            nextPageToken = token;
+          }
+        }
+
+        for (const k of Object.keys(curr)) {
+          walk(curr[k]);
+        }
+      };
+
+      walk(data);
+
+      return {
+        comments,
+        nextPageToken,
+      };
+    } catch (err: any) {
+      console.warn("getVideoComments error:", err.message);
+      return { comments: [] };
+    }
+  }
+
+  /**
+   * Fetch replies for a comment thread
+   */
+  async getCommentReplies(
+    replyToken: string
+  ): Promise<{ replies: YouTubeComment[] }> {
+    try {
+      const data = await this.queryInnerTubeNext({
+        continuation: replyToken,
+      });
+
+      const replies: YouTubeComment[] = [];
+      const seenIds = new Set<string>();
+
+      const mutations =
+        data.frameworkUpdates?.entityBatchUpdate?.mutations || [];
+      for (const m of mutations) {
+        const cep = m.payload?.commentEntityPayload;
+        if (
+          cep &&
+          cep.properties?.commentId &&
+          !seenIds.has(cep.properties.commentId)
+        ) {
+          seenIds.add(cep.properties.commentId);
+          replies.push({
+            id: cep.properties.commentId,
+            authorDisplayName: cep.author?.displayName || "Viewer",
+            authorProfileImageUrl:
+              cep.author?.avatarThumbnailUrl ||
+              "https://yt3.ggpht.com/default=s88-c-k-c0x00ffffff-no-rj",
+            textDisplay: cep.properties?.content?.content || "",
+            likeCount: this.parseViewCount(
+              cep.toolbar?.likeCountNotliked || "0"
+            ),
+            publishedAt: cep.properties?.publishedTime || "Recently",
+          });
+        }
+      }
+
+      return { replies };
+    } catch (err: any) {
+      console.warn("getCommentReplies error:", err.message);
+      return { replies: [] };
+    }
   }
 
   async getUserSubscriptions(
