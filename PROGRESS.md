@@ -46,6 +46,9 @@
   - Settings Page (`/settings`): Engine preference, API key, appearance theme, export backup, and clear history.
 - **Phase 6: Verification, Polishing, Production Build & Handoff**:
   - Full production build executed with zero warnings and zero errors (`pnpm build`).
+  - Created comprehensive `README.md` documenting features, architecture, setup, environment configuration, keyboard shortcuts, and scripts.
+  - Added `drizzle.config.ts` for schema migrations and database management (`pnpm db:generate`, `pnpm db:push`).
+  - Added standalone test suite runner `src/test/run-tests.ts` executable via `pnpm test`.
   - Fixed Lucide icon import in playlists pages (`FolderPlay` replaced with `ListVideo`).
   - Fixed multi-worker PGlite lock collision during static build analysis (`src/db/index.ts`).
   - Fixed database repository `deletePlaylist` method to correctly match `userId` (`playlists.userId` instead of `playlists.id`) and clean up child playlist items (`src/services/db/repository.ts`).
@@ -61,8 +64,12 @@
 - Safe build configuration: `serverExternalPackages: ["@electric-sql/pglite", "postgres"]`.
 
 ## 4. Files Created or Modified
+- `README.md`: Public-facing project overview, architecture, setup, configuration, and keyboard shortcuts guide.
 - `PHASES.md`: Project phases tracked and completed.
 - `PROGRESS.md`: Engineering handoff log.
+- `drizzle.config.ts`: Drizzle Kit migration configuration.
+- `package.json`: NPM scripts and dependencies configuration.
+- `src/test/run-tests.ts`: Automated test suite runner.
 - `src/lib/auth.ts`: Auth.js v5 Google OAuth provider with token lifecycle.
 - `src/lib/utils.ts`: Duration, view count, subscriber count, and relative time formatters.
 - `src/db/schema.ts` & `src/db/index.ts`: Drizzle ORM schema and dual database factory.
