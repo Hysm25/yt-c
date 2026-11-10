@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { YouTubeChannel } from "@/services/youtube/types";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,44 @@ interface ChannelHeaderProps {
 
 export function ChannelHeader({ channel }: ChannelHeaderProps) {
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
   const [bannerError, setBannerError] = useState(false);
+
+  useEffect(() => {
+    if (!channel?.id) return;
+    fetch(`/api/youtube/subscriptions?channelId=${encodeURIComponent(channel.id)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.isSubscribed !== undefined) {
+          setIsSubscribed(Boolean(data.isSubscribed));
+        }
+      })
+      .catch(() => {});
+  }, [channel?.id]);
+
+  const handleToggleSubscribe = async () => {
+    if (subscribing || !channel?.id) return;
+    setSubscribing(true);
+    try {
+      const res = await fetch("/api/youtube/subscriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channelId: channel.id,
+          channelTitle: channel.title,
+          avatarUrl: channel.avatarUrl,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.subscribed !== undefined) {
+        setIsSubscribed(data.subscribed);
+      }
+    } catch (err) {
+      console.warn("Toggle subscription error:", err);
+    } finally {
+      setSubscribing(false);
+    }
+  };
 
   return (
     <div className="flex flex-col w-full pb-6 border-b">
@@ -48,7 +85,7 @@ export function ChannelHeader({ channel }: ChannelHeaderProps) {
             <h1 className="text-xl sm:text-2xl font-bold">{channel.title}</h1>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-0.5">
               {channel.customUrl && (
-                <span className="font-medium text-foreground/80">
+                <span className="font-medium text-foreground">
                   {channel.customUrl.startsWith("@")
                     ? channel.customUrl
                     : `@${channel.customUrl}`}
@@ -95,7 +132,8 @@ export function ChannelHeader({ channel }: ChannelHeaderProps) {
           <Button
             variant={isSubscribed ? "secondary" : "default"}
             size="default"
-            onClick={() => setIsSubscribed(!isSubscribed)}
+            disabled={subscribing}
+            onClick={handleToggleSubscribe}
             className={`gap-1.5 font-medium ${
               isSubscribed
                 ? "bg-secondary text-foreground hover:bg-secondary/80"

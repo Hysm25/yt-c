@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { SessionProvider } from "@/components/providers/session-provider";
 import { Shell } from "@/components/layout/shell";
 
 export const metadata: Metadata = {
@@ -19,13 +18,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <SessionProvider>
-          <ThemeProvider defaultTheme="dark" storageKey="yt-ui-theme">
-            <Suspense fallback={<div className="h-screen w-screen bg-background" />}>
-              <Shell>{children}</Shell>
-            </Suspense>
-          </ThemeProvider>
-        </SessionProvider>
+        <ThemeProvider defaultTheme="dark" storageKey="yt-ui-theme">
+          <Suspense fallback={<div className="h-screen w-screen bg-background" />}>
+            <Shell>{children}</Shell>
+          </Suspense>
+        </ThemeProvider>
       </body>
     </html>
   );

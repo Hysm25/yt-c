@@ -7,12 +7,17 @@ import {
   formatSubscriberCount,
   formatRelativeTime,
 } from "../lib/utils";
+import {
+  signProxyUrl,
+  verifyProxyUrl,
+  isAllowedMediaHost,
+} from "../lib/stream-crypto";
 
 async function runTestSuite() {
   console.log("=== STARTING FULL TEST SUITE ===");
 
   // 1. Utility Tests
-  console.log("\n[1/3] Testing Utility Functions...");
+  console.log("\n[1/5] Testing Utility Functions...");
   if (formatDuration(65) !== "1:05") throw new Error("formatDuration failed");
   if (formatDuration(3665) !== "1:01:05") throw new Error("formatDuration hours failed");
   if (parseIsoDuration("PT4M13S") !== 253) throw new Error("parseIsoDuration failed");
@@ -20,8 +25,39 @@ async function runTestSuite() {
   if (formatSubscriberCount(2400000) !== "2.4M subscribers") throw new Error("formatSubscriberCount failed");
   console.log("✓ Utilities verified successfully");
 
-  // 2. Repository Tests
-  console.log("\n[2/3] Testing Database Repository...");
+  // 2. Stream Proxy Crypto & Allowlist Security Tests
+  console.log("\n[2/5] Testing Media Stream Proxy Security & Signatures...");
+  if (!isAllowedMediaHost("https://rr1---sn-uxaxjvhxbt2u-50xe.googlevideo.com/videoplayback")) {
+    throw new Error("googlevideo.com host should be allowed");
+  }
+  if (!isAllowedMediaHost("https://archive.org/download/sample.mp4")) {
+    throw new Error("archive.org host should be allowed");
+  }
+  if (isAllowedMediaHost("http://169.254.169.254/latest/meta-data/")) {
+    throw new Error("SSRF vulnerability: cloud metadata IP must be blocked");
+  }
+  if (isAllowedMediaHost("http://localhost:3000/internal")) {
+    throw new Error("SSRF vulnerability: localhost must be blocked");
+  }
+  if (isAllowedMediaHost("http://192.168.1.1/admin")) {
+    throw new Error("SSRF vulnerability: private IP must be blocked");
+  }
+
+  const testStreamUrl = "https://archive.org/download/sample.mp4";
+  const signed = signProxyUrl(testStreamUrl, 3600);
+  const parsed = new URL(`http://localhost${signed}`);
+  const exp = parsed.searchParams.get("exp");
+  const sig = parsed.searchParams.get("sig");
+  if (!verifyProxyUrl(testStreamUrl, exp, sig)) {
+    throw new Error("Valid proxy URL signature verification failed");
+  }
+  if (verifyProxyUrl(testStreamUrl, exp, "invalidsignature")) {
+    throw new Error("Forged proxy URL signature must be rejected");
+  }
+  console.log("✓ Media stream proxy cryptography and SSRF defenses verified");
+
+  // 3. Repository Tests
+  console.log("\n[3/5] Testing Database Repository...");
   const testUserId = `test-user-${Date.now()}`;
   
   // Settings
@@ -78,8 +114,29 @@ async function runTestSuite() {
   if (unlikeRes.liked) throw new Error("Like toggle false failed");
   console.log("✓ Video likes toggle verified");
 
-  // 3. YouTube Service Tests
-  console.log("\n[3/3] Testing YouTube Service & Cache...");
+  // 4. Subscriptions Repository Tests
+  console.log("\n[4/5] Testing Subscriptions Repository...");
+  const subRes = await repository.toggleSubscription(testUserId, {
+    channelId: "UC_test_channel",
+    channelTitle: "Test Channel",
+    avatarUrl: "https://example.com/avatar.jpg",
+  });
+  if (!subRes.subscribed) throw new Error("Subscription toggle true failed");
+  const isSub = await repository.isSubscribed(testUserId, "UC_test_channel");
+  if (!isSub) throw new Error("isSubscribed failed");
+  const subs = await repository.getSubscriptions(testUserId);
+  if (subs.length === 0 || subs[0].channelId !== "UC_test_channel") {
+    throw new Error("getSubscriptions failed");
+  }
+  const unsubRes = await repository.toggleSubscription(testUserId, {
+    channelId: "UC_test_channel",
+    channelTitle: "Test Channel",
+  });
+  if (unsubRes.subscribed) throw new Error("Subscription toggle false failed");
+  console.log("✓ Channel subscriptions verified");
+
+  // 5. YouTube Service Tests
+  console.log("\n[5/5] Testing YouTube Service & Cache...");
   const feed = await youtubeService.getTrendingFeed();
   if (!feed.videos || feed.videos.length === 0) throw new Error("getTrendingFeed failed");
   console.log(`✓ Trending feed fetched (${feed.videos.length} videos)`);
@@ -100,6 +157,6 @@ async function runTestSuite() {
 }
 
 runTestSuite().catch((err) => {
-  console.error("\n❌ TEST FAILED:", err);
+  console.error("Test Suite Failed:", err);
   process.exit(1);
 });

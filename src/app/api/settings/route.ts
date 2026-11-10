@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { repository } from "@/services/db/repository";
-import { auth } from "@/lib/auth";
+import { getGuestUserId, attachGuestCookieIfMissing } from "@/lib/guest-session";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const settings = await repository.getUserSettings(userId);
-    return NextResponse.json({ settings });
+    const res = NextResponse.json({ settings });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("GET /api/settings error:", error);
     return NextResponse.json(
@@ -19,8 +19,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const body = await request.json();
 
     const updated = await repository.updateUserSettings(userId, {
@@ -31,7 +30,8 @@ export async function POST(request: Request) {
       customApiKey: body.customApiKey,
     });
 
-    return NextResponse.json({ success: true, settings: updated });
+    const res = NextResponse.json({ success: true, settings: updated });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("POST /api/settings error:", error);
     return NextResponse.json(

@@ -1,21 +1,22 @@
 import { NextResponse } from "next/server";
 import { repository } from "@/services/db/repository";
-import { auth } from "@/lib/auth";
+import { getGuestUserId, attachGuestCookieIfMissing } from "@/lib/guest-session";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const { searchParams } = new URL(request.url);
     const videoId = searchParams.get("videoId");
 
     if (videoId) {
       const isLiked = await repository.isLikedVideo(userId, videoId);
-      return NextResponse.json({ isLiked });
+      const res = NextResponse.json({ isLiked });
+      return attachGuestCookieIfMissing(res, userId);
     }
 
     const liked = await repository.getLikedVideos(userId);
-    return NextResponse.json({ liked });
+    const res = NextResponse.json({ liked });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("GET /api/liked error:", error);
     return NextResponse.json(
@@ -27,8 +28,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const body = await request.json();
 
     if (!body.videoId || !body.title) {
@@ -47,7 +47,8 @@ export async function POST(request: Request) {
       duration: body.duration,
     });
 
-    return NextResponse.json({ success: true, liked: result.liked });
+    const res = NextResponse.json({ success: true, liked: result.liked });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("POST /api/liked error:", error);
     return NextResponse.json(

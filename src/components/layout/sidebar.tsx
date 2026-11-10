@@ -3,7 +3,6 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import {
   Home,
   Tv,
@@ -17,7 +16,6 @@ import {
   Newspaper,
   Radio,
   X,
-  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -49,12 +47,6 @@ const exploreNavItems = [
 
 export function Sidebar({ collapsed, isMobile, onCloseMobile }: SidebarProps) {
   const pathname = usePathname();
-  const { data: session } = useSession();
-
-  const handleTriggerSignIn = () => {
-    if (onCloseMobile) onCloseMobile();
-    window.dispatchEvent(new CustomEvent("trigger-google-signin"));
-  };
 
   // Mobile Drawer Mode
   if (isMobile) {
@@ -109,24 +101,6 @@ export function Sidebar({ collapsed, isMobile, onCloseMobile }: SidebarProps) {
             );
           })}
         </div>
-
-        {/* Sign In Prompt if Unauthenticated */}
-        {!session?.user && (
-          <div className="flex flex-col gap-2 p-3 my-2 rounded-2xl bg-secondary/40 border border-border/60">
-            <p className="text-xs text-foreground/90 font-medium leading-relaxed">
-              Sign in to like videos, comment, and subscribe.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTriggerSignIn}
-              className="rounded-full border-blue-500/80 text-blue-500 hover:bg-blue-500/10 font-semibold gap-1.5 text-xs w-fit"
-            >
-              <User className="h-3.5 w-3.5" />
-              <span>Sign In</span>
-            </Button>
-          </div>
-        )}
 
         <div className="flex flex-col gap-1 py-3 border-b">
           <div className="px-3 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -254,24 +228,6 @@ export function Sidebar({ collapsed, isMobile, onCloseMobile }: SidebarProps) {
           );
         })}
       </div>
-
-      {/* Sign In Prompt Card if Unauthenticated */}
-      {!session?.user && (
-        <div className="flex flex-col gap-2 p-3 my-3 rounded-2xl bg-secondary/40 border border-border/60">
-          <p className="text-xs text-foreground/90 font-medium leading-relaxed">
-            Sign in to like videos, comment, and subscribe.
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTriggerSignIn}
-            className="rounded-full border-blue-500/80 text-blue-500 hover:bg-blue-500/10 font-semibold gap-1.5 text-xs w-fit"
-          >
-            <User className="h-3.5 w-3.5" />
-            <span>Sign In</span>
-          </Button>
-        </div>
-      )}
 
       {/* Library & You */}
       <div className="flex flex-col gap-1 py-3 border-b">

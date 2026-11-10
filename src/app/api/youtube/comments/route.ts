@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { youtubeService } from "@/services/youtube/service-factory";
-import { auth } from "@/lib/auth";
 
 export async function GET(request: Request) {
   try {
@@ -35,9 +34,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
     const body = await request.json();
-    const { videoId, text, parentId } = body;
+    const { videoId, text, parentId, authorName } = body;
 
     if (!text?.trim()) {
       return NextResponse.json(
@@ -46,85 +44,22 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!session?.accessToken) {
-      return NextResponse.json(
-        {
-          error:
-            "Google account authentication is required to post comments to YouTube. Please sign in with your Google account.",
-          requiresAuth: true,
-        },
-        { status: 401 }
-      );
-    }
+    // Guest comment created locally
+    const guestComment = {
+      id: `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      authorDisplayName: authorName?.trim() || "Guest Viewer",
+      authorProfileImageUrl:
+        "https://yt3.ggpht.com/default=s88-c-k-c0x00ffffff-no-rj",
+      textDisplay: text.trim(),
+      likeCount: 0,
+      publishedAt: "Just now",
+      isGuest: true,
+      replyCount: 0,
+      parentId: parentId || null,
+      videoId: videoId || null,
+    };
 
-    // Post to official YouTube API using the authenticated user's access token
-    try {
-      if (parentId) {
-        // Posting a reply to an existing comment
-        const res = await fetch(
-          "https://www.googleapis.com/youtube/v3/comments?part=snippet",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              snippet: {
-                parentId,
-                textOriginal: text.trim(),
-              },
-            }),
-          }
-        );
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error?.message || "YouTube API reply submission failed");
-        }
-        return NextResponse.json({ success: true, comment: data });
-      } else {
-        // Posting a top-level comment thread
-        if (!videoId) {
-          return NextResponse.json(
-            { error: "videoId is required for top-level comments" },
-            { status: 400 }
-          );
-        }
-        const res = await fetch(
-          "https://www.googleapis.com/youtube/v3/commentThreads?part=snippet",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              snippet: {
-                videoId,
-                topLevelComment: {
-                  snippet: {
-                    textOriginal: text.trim(),
-                  },
-                },
-              },
-            }),
-          }
-        );
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error?.message || "YouTube API comment submission failed");
-        }
-        return NextResponse.json({ success: true, comment: data });
-      }
-    } catch (apiError: any) {
-      console.warn("YouTube comment post API error:", apiError.message);
-      return NextResponse.json(
-        {
-          error: `YouTube API permission error: ${apiError.message}. Make sure your account has YouTube channel permissions enabled.`,
-        },
-        { status: 403 }
-      );
-    }
+    return NextResponse.json({ success: true, comment: guestComment });
   } catch (error: any) {
     console.error("POST /api/youtube/comments error:", error);
     return NextResponse.json(

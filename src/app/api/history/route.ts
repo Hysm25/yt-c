@@ -1,22 +1,23 @@
 import { NextResponse } from "next/server";
 import { repository } from "@/services/db/repository";
-import { auth } from "@/lib/auth";
+import { getGuestUserId, attachGuestCookieIfMissing } from "@/lib/guest-session";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "50", 10);
     const videoId = searchParams.get("videoId");
 
     if (videoId) {
       const progress = await repository.getWatchProgress(userId, videoId);
-      return NextResponse.json({ progress });
+      const res = NextResponse.json({ progress });
+      return attachGuestCookieIfMissing(res, userId);
     }
 
     const history = await repository.getWatchHistory(userId, limit);
-    return NextResponse.json({ history });
+    const res = NextResponse.json({ history });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("GET /api/history error:", error);
     return NextResponse.json(
@@ -28,8 +29,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const body = await request.json();
 
     if (!body.videoId || !body.title) {
@@ -51,7 +51,8 @@ export async function POST(request: Request) {
       totalSeconds: body.totalSeconds || 0,
     });
 
-    return NextResponse.json({ success: true, record });
+    const res = NextResponse.json({ success: true, record });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("POST /api/history error:", error);
     return NextResponse.json(
@@ -63,18 +64,19 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const { searchParams } = new URL(request.url);
     const videoId = searchParams.get("videoId");
 
     if (videoId) {
       await repository.deleteWatchHistoryItem(userId, videoId);
-      return NextResponse.json({ success: true, deletedVideoId: videoId });
+      const res = NextResponse.json({ success: true, deletedVideoId: videoId });
+      return attachGuestCookieIfMissing(res, userId);
     }
 
     await repository.clearWatchHistory(userId);
-    return NextResponse.json({ success: true, cleared: true });
+    const res = NextResponse.json({ success: true, cleared: true });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("DELETE /api/history error:", error);
     return NextResponse.json(

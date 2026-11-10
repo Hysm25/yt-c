@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { signProxyUrl } from "@/lib/stream-crypto";
 
-// Verified public direct streams for open media assets and reliable native testing
-const DIRECT_STREAM_MAP: Record<string, string> = {
+// Verified open-source media fixtures for reliable native HTML5 playback testing
+const OPEN_TEST_STREAMS: Record<string, string> = {
   L_LUpnjgPso:
     "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4",
   jNQXAC9IVRw:
@@ -16,14 +17,82 @@ const DIRECT_STREAM_MAP: Record<string, string> = {
     "https://archive.org/download/Sintel/sintel-2048-surround.mp4",
 };
 
+/**
+ * Dynamic stream extractor using YouTube InnerTube Player API
+ */
+async function extractProgressiveStream(videoId: string): Promise<{
+  url: string;
+  itag: number;
+  qualityLabel?: string;
+  quality?: string;
+} | null> {
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/player", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Linux; Android 10; Quest 2) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/31.0.0.28.69.549214717 SamsungBrowser/4.0 Chrome/120.0.6099.144 Mobile VR Safari/537.36",
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: "ANDROID_VR",
+            clientVersion: "1.60.19",
+            hl: "en",
+            gl: "US",
+          },
+        },
+        videoId,
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const formats = data.streamingData?.formats;
+
+    if (!Array.isArray(formats) || formats.length === 0) {
+      return null;
+    }
+
+    // Look for a progressive stream with direct URL and no cipher
+    const directFormat = formats.find(
+      (f: any) =>
+        f.url &&
+        !f.signatureCipher &&
+        !f.cipher &&
+        (f.itag === 18 || f.itag === 22 || f.mimeType?.includes("video/mp4"))
+    );
+
+    if (directFormat && directFormat.url) {
+      return {
+        url: directFormat.url,
+        itag: directFormat.itag,
+        qualityLabel: directFormat.qualityLabel,
+        quality: directFormat.quality,
+      };
+    }
+
+    return null;
+  } catch (err: any) {
+    console.warn(`Stream extraction failed for ${videoId}:`, err.message);
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const videoId = searchParams.get("id") || searchParams.get("videoId");
     const directUrl = searchParams.get("url");
 
-    // If explicit direct media URL was provided
-    if (directUrl && (directUrl.startsWith("http://") || directUrl.startsWith("https://"))) {
+    // 1. Explicit direct media URL provided
+    if (
+      directUrl &&
+      (directUrl.startsWith("http://") || directUrl.startsWith("https://"))
+    ) {
       return NextResponse.json({
         success: true,
         streamUrl: directUrl,
@@ -40,7 +109,7 @@ export async function GET(request: Request) {
       );
     }
 
-    // If videoId itself is a direct media URL
+    // 2. Direct media file URL passed as videoId
     if (
       videoId.startsWith("http://") ||
       videoId.startsWith("https://") ||
@@ -56,25 +125,41 @@ export async function GET(request: Request) {
       });
     }
 
-    // Check verified direct streams map
-    const mappedStream = DIRECT_STREAM_MAP[videoId];
-    if (mappedStream) {
+    // 3. Attempt dynamic progressive stream extraction from YouTube
+    const extracted = await extractProgressiveStream(videoId);
+    if (extracted && extracted.url) {
+      const signedProxyUrl = signProxyUrl(extracted.url, 7200);
       return NextResponse.json({
         success: true,
-        streamUrl: mappedStream,
+        streamUrl: signedProxyUrl,
         format: "mp4",
-        quality: "720p",
+        quality: extracted.qualityLabel || extracted.quality || "360p",
+        itag: extracted.itag,
         hasDirectStream: true,
+        isProxied: true,
       });
     }
 
-    // YouTube streams protected by signature ciphers require YouTube IFrame embed
+    // 4. Open-source media fixture fallback for verified test assets
+    const openFixture = OPEN_TEST_STREAMS[videoId];
+    if (openFixture) {
+      return NextResponse.json({
+        success: true,
+        streamUrl: openFixture,
+        format: "mp4",
+        quality: "720p",
+        hasDirectStream: true,
+        isTestFixture: true,
+      });
+    }
+
+    // 5. Video is restricted by YouTube signature cipher or Botguard verification
     return NextResponse.json({
       success: true,
       hasDirectStream: false,
       recommendedProvider: "embed",
       message:
-        "Direct stream is unavailable for this video due to YouTube cipher protection. The Official YouTube Player is recommended for 100% playback fidelity.",
+        "Direct progressive stream is unavailable for this video due to YouTube cipher protection. The Official YouTube Player fallback is recommended for 100% playback fidelity.",
     });
   } catch (error: any) {
     console.error("GET /api/stream error:", error);

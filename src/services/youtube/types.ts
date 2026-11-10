@@ -55,6 +55,7 @@ export interface YouTubeComment {
   likeCount: number;
   publishedAt: string;
   replyCount?: number;
+  replyContinuationToken?: string;
   replies?: YouTubeComment[];
 }
 

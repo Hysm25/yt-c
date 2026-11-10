@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { repository } from "@/services/db/repository";
-import { auth } from "@/lib/auth";
+import { getGuestUserId, attachGuestCookieIfMissing } from "@/lib/guest-session";
 import { youtubeService } from "@/services/youtube/service-factory";
 
 export async function GET(
@@ -9,19 +9,22 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await auth();
+    const userId = getGuestUserId(request);
 
     // Try local database first
     const playlist = await repository.getPlaylistWithItems(id);
     if (playlist) {
-      return NextResponse.json({ playlist: { ...playlist, isYouTube: false } });
+      const res = NextResponse.json({
+        playlist: { ...playlist, isYouTube: false },
+      });
+      return attachGuestCookieIfMissing(res, userId);
     }
 
-    // If not in local DB and user is authenticated with Google OAuth or it's a YouTube playlist ID
-    if (session?.accessToken || id.startsWith("PL") || id.startsWith("UU")) {
-      const ytResult = await youtubeService.getPlaylistItems(id, session?.accessToken);
+    // If it's a YouTube playlist ID (e.g., PL... or UU...)
+    if (id.startsWith("PL") || id.startsWith("UU")) {
+      const ytResult = await youtubeService.getPlaylistItems(id);
       if (ytResult?.items?.length > 0) {
-        return NextResponse.json({
+        const res = NextResponse.json({
           playlist: {
             id,
             title: ytResult.title || "YouTube Playlist",
@@ -30,6 +33,7 @@ export async function GET(
             isYouTube: true,
           },
         });
+        return attachGuestCookieIfMissing(res, userId);
       }
     }
 
@@ -49,8 +53,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const { id: playlistId } = await params;
     const body = await request.json();
 
@@ -73,7 +76,8 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json({ success: true, playlist });
+    const res = NextResponse.json({ success: true, playlist });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("PUT /api/playlists/[id] error:", error);
     return NextResponse.json(
@@ -88,6 +92,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getGuestUserId(request);
     const { id: playlistId } = await params;
     const body = await request.json();
 
@@ -107,7 +112,8 @@ export async function POST(
       duration: body.duration,
     });
 
-    return NextResponse.json({ success: true, item });
+    const res = NextResponse.json({ success: true, item });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("POST /api/playlists/[id] error:", error);
     return NextResponse.json(
@@ -122,19 +128,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id || "guest";
+    const userId = getGuestUserId(request);
     const { id: playlistId } = await params;
     const { searchParams } = new URL(request.url);
     const videoId = searchParams.get("videoId");
 
     if (videoId) {
       await repository.removePlaylistItem(playlistId, videoId);
-      return NextResponse.json({ success: true, removedVideoId: videoId });
+      const res = NextResponse.json({ success: true, removedVideoId: videoId });
+      return attachGuestCookieIfMissing(res, userId);
     }
 
     await repository.deletePlaylist(userId, playlistId);
-    return NextResponse.json({ success: true, deletedPlaylistId: playlistId });
+    const res = NextResponse.json({
+      success: true,
+      deletedPlaylistId: playlistId,
+    });
+    return attachGuestCookieIfMissing(res, userId);
   } catch (error: any) {
     console.error("DELETE /api/playlists/[id] error:", error);
     return NextResponse.json(

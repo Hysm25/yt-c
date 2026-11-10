@@ -4,6 +4,7 @@ import {
   playlists,
   playlistItems,
   likedVideos,
+  subscriptions,
   userSettings,
 } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -274,6 +275,59 @@ export const repository = {
         likedAt: new Date(),
       });
       return { liked: true };
+    }
+  },
+
+  // --- Subscriptions ---
+  async getSubscriptions(userId: string) {
+    return await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, userId))
+      .orderBy(desc(subscriptions.subscribedAt));
+  },
+
+  async isSubscribed(userId: string, channelId: string) {
+    const records = await db
+      .select()
+      .from(subscriptions)
+      .where(
+        and(eq(subscriptions.userId, userId), eq(subscriptions.channelId, channelId))
+      )
+      .limit(1);
+    return !!records[0];
+  },
+
+  async toggleSubscription(
+    userId: string,
+    channel: {
+      channelId: string;
+      channelTitle: string;
+      avatarUrl?: string;
+    }
+  ) {
+    const isSub = await this.isSubscribed(userId, channel.channelId);
+    if (isSub) {
+      await db
+        .delete(subscriptions)
+        .where(
+          and(
+            eq(subscriptions.userId, userId),
+            eq(subscriptions.channelId, channel.channelId)
+          )
+        );
+      return { subscribed: false };
+    } else {
+      const id = crypto.randomUUID();
+      await db.insert(subscriptions).values({
+        id,
+        userId,
+        channelId: channel.channelId,
+        channelTitle: channel.channelTitle,
+        avatarUrl: channel.avatarUrl || "",
+        subscribedAt: new Date(),
+      });
+      return { subscribed: true };
     }
   },
 

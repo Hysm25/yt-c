@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
 import {
   Sliders,
   Film,
@@ -10,41 +9,24 @@ import {
   Palette,
   Trash2,
   Check,
-  Download,
   User,
   ShieldCheck,
-  LogOut,
-  LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { useTheme } from "@/components/providers/theme-provider";
 
 export default function SettingsPage() {
-  const { data: session, status: sessionStatus } = useSession();
   const { theme, setTheme } = useTheme();
 
-  const [provider, setProvider] = useState<"html5" | "embed">("embed");
+  const [provider, setProvider] = useState<"html5" | "embed">("html5");
   const [apiKey, setApiKey] = useState("");
   const [autoplay, setAutoplay] = useState(true);
   const [quality, setQuality] = useState("auto");
-  const [authStatus, setAuthStatus] = useState<{ configured: boolean; missing?: string[] }>({
-    configured: false,
-  });
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/auth/status")
-      .then((res) => res.json())
-      .then((data) => {
-        setAuthStatus({
-          configured: Boolean(data.configured),
-          missing: data.missing || [],
-        });
-      })
-      .catch(() => {});
-
     fetch("/api/settings")
       .then((res) => res.json())
       .then((data) => {
@@ -62,11 +44,6 @@ export default function SettingsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      localStorage.setItem("yt-playback-provider", provider);
-      window.dispatchEvent(
-        new CustomEvent("yt-playback-provider-changed", { detail: provider })
-      );
-
       await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,150 +55,67 @@ export default function SettingsPage() {
         }),
       });
 
+      localStorage.setItem("yt-playback-provider", provider);
+      window.dispatchEvent(
+        new CustomEvent("yt-playback-provider-changed", { detail: provider })
+      );
+
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err) {
-      console.warn("Failed to save settings:", err);
+      console.error("Save settings error:", err);
     }
   };
 
   const handleClearHistory = async () => {
-    if (confirm("Are you sure you want to clear your local watch history?")) {
+    if (confirm("Are you sure you want to clear your entire watch history?")) {
       await fetch("/api/history", { method: "DELETE" });
-      alert("Watch history cleared successfully!");
+      alert("Watch history cleared.");
     }
   };
 
-  const handleExportData = async () => {
-    try {
-      const [histRes, plRes, likedRes] = await Promise.all([
-        fetch("/api/history").then((r) => r.json()),
-        fetch("/api/playlists").then((r) => r.json()),
-        fetch("/api/liked").then((r) => r.json()),
-      ]);
-
-      const backup = {
-        exportedAt: new Date().toISOString(),
-        history: histRes.history || [],
-        playlists: plRes.playlists || [],
-        liked: likedRes.liked || [],
-      };
-
-      const blob = new Blob([JSON.stringify(backup, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `youtube-client-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.warn("Export failed:", err);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-sm text-muted-foreground animate-pulse">
+          Loading settings...
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl mx-auto p-2 sm:p-4 pb-20">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b pb-4">
-        <Sliders className="h-6 w-6 text-red-500" />
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto p-4 pb-20">
+      <div className="flex items-center justify-between">
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
           Settings & Preferences
         </h1>
       </div>
 
-      {/* Account & Authentication Card */}
+      {/* Guest Mode Profile Card */}
       <div className="flex flex-col gap-3 rounded-2xl border bg-secondary/30 p-5">
         <div className="flex items-center gap-2">
           <User className="h-4 w-4 text-red-500" />
           <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Account & Authentication
+            Guest Profile & Data Isolation
           </h2>
         </div>
 
-        {session?.user ? (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-1">
-            <div className="flex items-center gap-3">
-              <Avatar
-                src={session.user.image || undefined}
-                alt={session.user.name || "User"}
-                fallback={session.user.name || "U"}
-                size="lg"
-              />
-              <div className="flex flex-col">
-                <span className="font-semibold text-sm">
-                  {session.user.name || "Connected User"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {session.user.email}
-                </span>
-                <span className="inline-flex items-center gap-1 text-[11px] text-green-500 font-medium pt-0.5">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Google OAuth Active (YouTube Scopes Granted)
-                </span>
-              </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-1">
+          <div className="flex items-center gap-3">
+            <Avatar fallback="G" size="lg" />
+            <div className="flex flex-col">
+              <span className="font-semibold text-sm">Guest Account</span>
+              <span className="text-xs text-muted-foreground">
+                Standalone / No Account Required
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px] text-green-500 font-medium pt-0.5">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Local Persistence Active (History, Playlists, Liked Videos, Subscriptions)
+              </span>
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => signOut()}
-              className="gap-1.5 text-xs text-destructive hover:bg-destructive/10"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Sign Out</span>
-            </Button>
           </div>
-        ) : (
-          <div className="flex flex-col gap-3 pt-1">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-foreground">
-                  Guest Mode (Local Persistence)
-                </span>
-                <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
-                  You are currently browsing as a Guest. Your watch history, playlists, and liked videos are saved to your local PostgreSQL database. Connect your Google account to sync live YouTube subscriptions and playlists.
-                </p>
-              </div>
-
-              {authStatus.configured ? (
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={() => signIn("google")}
-                  className="gap-2 text-xs font-semibold shrink-0"
-                >
-                  <LogIn className="h-3.5 w-3.5" />
-                  <span>Sign in with Google</span>
-                </Button>
-              ) : null}
-            </div>
-
-            {!authStatus.configured && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-                <div className="flex items-center gap-1.5 font-semibold text-amber-500 pb-1">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  <span>Google OAuth Configuration Guide</span>
-                </div>
-                <p className="text-muted-foreground text-[11px] leading-relaxed pb-2">
-                  To enable Google Sign-In, create an OAuth 2.0 Web Client in Google Cloud Console and set the following in your <code className="text-foreground font-mono">.env.local</code> file:
-                </p>
-                <pre className="rounded bg-black/40 p-2 font-mono text-[10px] text-zinc-300 overflow-x-auto space-y-0.5">
-                  <div>AUTH_GOOGLE_ID=your_client_id_here.apps.googleusercontent.com</div>
-                  <div>AUTH_GOOGLE_SECRET=GOCSPX-your_client_secret_here</div>
-                  <div>NEXTAUTH_URL=http://localhost:3000</div>
-                </pre>
-                <div className="pt-2 text-[10px] text-muted-foreground">
-                  Authorized Redirect URI required in Google Cloud Console:{" "}
-                  <code className="text-foreground font-mono select-all">http://localhost:3000/api/auth/callback/google</code>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="flex flex-col gap-6">
@@ -231,143 +125,183 @@ export default function SettingsPage() {
             Default Playback Engine
           </h2>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Choose your preferred video player. The HTML5 engine uses native custom player controls,
-            while the YouTube Embed engine guarantees 100% video compatibility with no signature cipher restrictions.
+            Choose your preferred video player. The Native HTML5 engine uses the browser&apos;s standard player controls,
+            while the YouTube Embed engine provides an official fallback for cipher-restricted streams.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             {/* HTML5 Option */}
             <div
               onClick={() => setProvider("html5")}
-              className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+              className={`cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all ${
                 provider === "html5"
-                  ? "border-red-500 bg-red-500/10"
-                  : "border-border hover:bg-secondary/60"
+                  ? "border-red-500 bg-red-500/10 shadow-xs"
+                  : "hover:bg-secondary/50 border-border"
               }`}
             >
-              <Film className="h-5 w-5 text-red-500 mt-0.5" />
-              <div className="flex flex-col">
-                <span className="font-semibold text-sm">HTML5 Video Player</span>
-                <span className="text-xs text-muted-foreground pt-0.5">
-                  Custom timeline scrubber, speed controls, hotkeys & picture-in-picture.
-                </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <Film className="h-4 w-4 text-blue-500" />
+                  <span>Native HTML5 Player (Default)</span>
+                </div>
+                {provider === "html5" && (
+                  <Check className="h-4 w-4 text-red-500" />
+                )}
               </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Uses the browser&apos;s native &lt;video controls&gt; element for direct media playback.
+              </p>
             </div>
 
             {/* Embed Option */}
             <div
               onClick={() => setProvider("embed")}
-              className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+              className={`cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all ${
                 provider === "embed"
-                  ? "border-blue-500 bg-blue-500/10"
-                  : "border-border hover:bg-secondary/60"
+                  ? "border-red-500 bg-red-500/10 shadow-xs"
+                  : "hover:bg-secondary/50 border-border"
               }`}
             >
-              <Tv className="h-5 w-5 text-blue-500 mt-0.5" />
-              <div className="flex flex-col">
-                <span className="font-semibold text-sm">Official YouTube Embed</span>
-                <span className="text-xs text-muted-foreground pt-0.5">
-                  Official player embed with 100% playback fidelity for all video types.
-                </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <Tv className="h-4 w-4 text-red-500" />
+                  <span>Official YouTube Player</span>
+                </div>
+                {provider === "embed" && (
+                  <Check className="h-4 w-4 text-red-500" />
+                )}
               </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Official YouTube player iframe ensuring 100% video and audio compatibility.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* API Key Configuration */}
-        <div className="flex flex-col gap-3 rounded-2xl border bg-secondary/30 p-5">
-          <div className="flex items-center gap-2">
-            <Key className="h-4 w-4 text-amber-500" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Google Cloud API Key (Optional)
-            </h2>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Provide your personal YouTube Data API v3 key to query live data directly from Google Cloud.
-            If left blank or if quota is depleted, the client runs on its built-in offline/demo provider.
-          </p>
+        {/* Playback Preferences */}
+        <div className="flex flex-col gap-4 rounded-2xl border bg-secondary/30 p-5">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            Playback Preferences
+          </h2>
 
-          <input
-            type="text"
-            placeholder="AIzaSy..."
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            className="rounded-lg border bg-secondary/50 px-3.5 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
-          />
+          <div className="flex items-center justify-between py-2 border-b">
+            <div>
+              <div className="text-xs font-semibold">Autoplay Next Video</div>
+              <div className="text-[11px] text-muted-foreground">
+                Automatically play the next video in search results or playlists
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={autoplay}
+              onChange={(e) => setAutoplay(e.target.checked)}
+              className="h-4 w-4 rounded accent-red-600 cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <div className="text-xs font-semibold">Preferred Quality</div>
+              <div className="text-[11px] text-muted-foreground">
+                Select your preferred initial resolution
+              </div>
+            </div>
+            <select
+              value={quality}
+              onChange={(e) => setQuality(e.target.value)}
+              className="rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-red-500"
+            >
+              <option value="auto">Auto (Recommended)</option>
+              <option value="1080p">1080p (Full HD)</option>
+              <option value="720p">720p (HD)</option>
+              <option value="480p">480p</option>
+              <option value="360p">360p</option>
+            </select>
+          </div>
         </div>
 
-        {/* Appearance & Themes */}
+        {/* Theme Settings */}
         <div className="flex flex-col gap-3 rounded-2xl border bg-secondary/30 p-5">
           <div className="flex items-center gap-2">
-            <Palette className="h-4 w-4 text-purple-400" />
+            <Palette className="h-4 w-4 text-red-500" />
             <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Appearance
+              Theme & Appearance
             </h2>
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
-            {(["dark", "light", "system"] as const).map((t) => (
-              <Button
+          <div className="grid grid-cols-3 gap-2 pt-2">
+            {(["light", "dark", "system"] as const).map((t) => (
+              <button
                 key={t}
                 type="button"
-                variant={theme === t ? "default" : "secondary"}
-                size="sm"
                 onClick={() => setTheme(t)}
-                className="capitalize text-xs font-medium"
+                className={`flex items-center justify-center py-2 px-3 rounded-xl border text-xs font-medium capitalize transition-all ${
+                  theme === t
+                    ? "border-red-500 bg-red-500/10 text-foreground font-semibold"
+                    : "hover:bg-secondary border-border text-muted-foreground"
+                }`}
               >
                 {t}
-              </Button>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Data Management & Export */}
+        {/* YouTube API Key (Optional) */}
         <div className="flex flex-col gap-3 rounded-2xl border bg-secondary/30 p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Key className="h-4 w-4 text-red-500" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              Custom YouTube Data API Key (Optional)
+            </h2>
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            By default, YouTube Web Client uses direct public YouTube web extraction. You can optionally supply your own Google Cloud API Key for fallback official quota.
+          </p>
+          <input
+            type="password"
+            placeholder="AIzaSy..."
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="w-full rounded-xl border bg-background px-3 py-2 text-xs font-mono placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-red-500"
+          />
+        </div>
+
+        {/* Data Management */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-destructive">
             Data Management
           </h2>
-          <p className="text-xs text-muted-foreground">
-            Manage your local watch history, custom playlists, and liked videos database.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              Clear your local watch history records
+            </span>
             <Button
               type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExportData}
-              className="gap-1.5 text-xs"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span>Export Client Backup</span>
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
+              variant="destructive"
               size="sm"
               onClick={handleClearHistory}
-              className="gap-1.5 text-xs text-destructive hover:bg-destructive/10"
+              className="gap-1.5 text-xs font-medium"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Clear Local History</span>
+              <span>Clear History</span>
             </Button>
           </div>
         </div>
 
-        {/* Submit Bar */}
-        <div className="flex items-center justify-between border-t pt-4">
-          {savedSuccess ? (
-            <div className="flex items-center gap-1.5 text-xs font-medium text-green-500">
-              <Check className="h-4 w-4" />
-              <span>Preferences saved successfully!</span>
-            </div>
-          ) : (
-            <div />
+        {/* Save Button */}
+        <div className="flex items-center justify-end gap-3 pt-2">
+          {savedSuccess && (
+            <span className="flex items-center gap-1 text-xs text-green-500 font-medium">
+              <Check className="h-3.5 w-3.5" />
+              <span>Settings saved!</span>
+            </span>
           )}
-
-          <Button type="submit" variant="youtube" size="default" className="font-semibold">
-            Save Changes
+          <Button
+            type="submit"
+            className="bg-red-600 hover:bg-red-700 text-white font-medium text-xs px-6"
+          >
+            Save Preferences
           </Button>
         </div>
       </form>

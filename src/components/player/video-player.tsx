@@ -25,7 +25,7 @@ export function VideoPlayer({
   onEnded,
   onNextVideo,
 }: VideoPlayerProps) {
-  const [provider, setProvider] = useState<"embed" | "html5">("embed");
+  const [provider, setProvider] = useState<"embed" | "html5">("html5");
 
   // Sync provider preference from localStorage & listen for changes
   useEffect(() => {

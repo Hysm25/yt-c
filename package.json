@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "tsx src/test/run-tests.ts",
+    "test": "bun run src/test/run-tests.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push"
   },
@@ -19,7 +19,6 @@
     "drizzle-orm": "^0.40.0",
     "lucide-react": "^1.16.0",
     "next": "^15.1.7",
-    "next-auth": "5.0.0-beta.32",
     "postgres": "^3.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

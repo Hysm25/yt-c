@@ -55,43 +55,6 @@ export function getDatabase() {
 async function initEmbeddedTables(pglite: PGlite) {
   try {
     await pglite.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        email TEXT NOT NULL UNIQUE,
-        "emailVerified" TIMESTAMP,
-        image TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS accounts (
-        "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        type TEXT NOT NULL,
-        provider TEXT NOT NULL,
-        "providerAccountId" TEXT NOT NULL,
-        refresh_token TEXT,
-        access_token TEXT,
-        expires_at INTEGER,
-        token_type TEXT,
-        scope TEXT,
-        id_token TEXT,
-        session_state TEXT,
-        PRIMARY KEY (provider, "providerAccountId")
-      );
-
-      CREATE TABLE IF NOT EXISTS sessions (
-        "sessionToken" TEXT PRIMARY KEY,
-        "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        expires TIMESTAMP NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS "verificationToken" (
-        identifier TEXT NOT NULL,
-        token TEXT NOT NULL,
-        expires TIMESTAMP NOT NULL,
-        PRIMARY KEY (identifier, token)
-      );
-
       CREATE TABLE IF NOT EXISTS watch_history (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -140,6 +103,15 @@ async function initEmbeddedTables(pglite: PGlite) {
         thumbnail_url TEXT,
         duration INTEGER DEFAULT 0,
         liked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        channel_title TEXT NOT NULL,
+        avatar_url TEXT,
+        subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS user_settings (
