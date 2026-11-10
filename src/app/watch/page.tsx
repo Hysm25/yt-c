@@ -31,6 +31,25 @@ function WatchPageContent() {
   const [relatedVideos, setRelatedVideos] = useState<YouTubeVideo[]>([]);
   const [initialProgress, setInitialProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isTheaterMode, setIsTheaterMode] = useState(false);
+
+  // Load theater mode preference on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("yt-theater-mode");
+      if (saved === "true") setIsTheaterMode(true);
+    } catch {}
+  }, []);
+
+  const handleToggleTheaterMode = () => {
+    setIsTheaterMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("yt-theater-mode", next ? "true" : "false");
+      } catch {}
+      return next;
+    });
+  };
 
   // Playlist State
   const [playlist, setPlaylist] = useState<any | null>(null);
@@ -151,23 +170,45 @@ function WatchPageContent() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto p-0 sm:p-4">
-      {/* Main Watch Column: Video Player, Video Metadata */}
-      <div className="lg:col-span-2 flex flex-col gap-4 px-2 sm:px-0">
-        {/* Player Container */}
-        <VideoPlayer
-          videoId={videoId}
-          title={video?.title}
-          channelTitle={video?.channelTitle}
-          thumbnailUrl={video?.thumbnails.maxres?.url || video?.thumbnails.high?.url}
-          initialProgressSeconds={initialProgress}
-          onEnded={handleNextVideo}
-          onNextVideo={handleNextVideo}
-        />
+    <div className="flex flex-col w-full">
+      {/* Theater Mode: Full-Width Player Header */}
+      {isTheaterMode && (
+        <div className="w-full max-w-[1700px] mx-auto mb-4 px-0 sm:px-4">
+          <VideoPlayer
+            videoId={videoId}
+            title={video?.title}
+            channelTitle={video?.channelTitle}
+            thumbnailUrl={video?.thumbnails.maxres?.url || video?.thumbnails.high?.url}
+            initialProgressSeconds={initialProgress}
+            isTheaterMode={true}
+            onToggleTheaterMode={handleToggleTheaterMode}
+            onEnded={handleNextVideo}
+            onNextVideo={handleNextVideo}
+          />
+        </div>
+      )}
 
-        {/* Video Info: Title, Actions, Channel, Description */}
-        {video && <VideoInfo video={video} channel={channel} />}
-      </div>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full p-0 sm:p-4">
+        {/* Main Watch Column: Video Player (if not theater), Video Metadata */}
+        <div className="lg:col-span-2 flex flex-col gap-4 px-2 sm:px-0">
+          {!isTheaterMode && (
+            <VideoPlayer
+              videoId={videoId}
+              title={video?.title}
+              channelTitle={video?.channelTitle}
+              thumbnailUrl={video?.thumbnails.maxres?.url || video?.thumbnails.high?.url}
+              initialProgressSeconds={initialProgress}
+              isTheaterMode={false}
+              onToggleTheaterMode={handleToggleTheaterMode}
+              onEnded={handleNextVideo}
+              onNextVideo={handleNextVideo}
+            />
+          )}
+
+          {/* Video Info: Title, Actions, Channel, Description */}
+          {video && <VideoInfo video={video} channel={channel} />}
+        </div>
 
       {/* Right Column: Playlist Queue (if active) & Related Videos */}
       <div className="flex flex-col gap-4 px-3 sm:px-0 pb-12 sm:pb-0">
@@ -274,7 +315,8 @@ function WatchPageContent() {
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }
 
 export default function WatchPage() {

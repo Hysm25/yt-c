@@ -19,27 +19,11 @@ export function Shell({ children }: ShellProps) {
   // In watch page, default to collapsed sidebar for theater immersion
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isWatchPage);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
-  const [playbackProvider, setPlaybackProvider] = useState<"html5" | "embed">("embed");
 
   // Close mobile drawer on route navigation
   useEffect(() => {
     setIsMobileDrawerOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    const savedProvider = localStorage.getItem("yt-playback-provider") as "html5" | "embed" | null;
-    if (savedProvider === "html5" || savedProvider === "embed") {
-      setPlaybackProvider(savedProvider);
-    }
-  }, []);
-
-  const togglePlaybackProvider = () => {
-    const nextProvider = playbackProvider === "html5" ? "embed" : "html5";
-    setPlaybackProvider(nextProvider);
-    localStorage.setItem("yt-playback-provider", nextProvider);
-    // Dispatch a custom event so the player can switch dynamically without page reload
-    window.dispatchEvent(new CustomEvent("yt-playback-provider-changed", { detail: nextProvider }));
-  };
 
   const toggleSidebar = () => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -54,8 +38,6 @@ export function Shell({ children }: ShellProps) {
       {/* Top Navigation */}
       <Header
         onToggleSidebar={toggleSidebar}
-        playbackProvider={playbackProvider}
-        onTogglePlaybackProvider={togglePlaybackProvider}
       />
 
       {/* Main Container */}

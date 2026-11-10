@@ -1,21 +1,37 @@
 # YouTube Web Client
 
-A modern, high-performance **YouTube Web Client** featuring an independent custom user interface, a native browser HTML5 video player (`<video controls>`) with cipher-deciphering stream extraction and secure media proxying, authentic video descriptions with interactive formatting, embedded PostgreSQL persistence with zero background daemons, and complete account-free guest privacy.
+A modern, high-performance **YouTube Web Client** featuring an independent custom user interface, a JavaScript video player library engine ([Video.js](https://videojs.com/)) with YouTube-standard playback controls, adaptive quality selection, closed captions, playback speeds, theater mode, keyboard shortcuts, authentic video descriptions, embedded PostgreSQL persistence with zero background daemons, and complete account-free guest privacy.
+
+> [!NOTE]
+> All YouTube Official Player, IFrame Player, and third-party embedded player dependencies have been completely removed. Video playback is driven entirely through extracted media streams and the local Video.js engine.
 
 ---
 
 ## ✨ Features
 
-### 🎬 Native HTML5 Video Playback & Cipher Decryption
-- **Native Browser HTML5 Player (`<video controls>`) as Primary**: Uses the browser's native `<video controls>` element with default appearance and behavior. No bloated custom player UI—clean, high-performance, native browser video playback.
-- **Cipher-Protected Stream Decryption**: Deciphers YouTube signature ciphers and `n`-parameter throttling via `@distube/ytdl-core`, unlocking direct streaming for cipher-protected videos in 1080p, 720p, 480p, and 360p.
-- **Dual-Track Synchronized HTML5 Playback**: Seamlessly synchronizes adaptive video streams (`avc1`/H.264) with native high-quality audio streams (`mp4a`/AAC) in real time across play, pause, seek, volume, and playback rate changes.
-- **Secure Next.js Media Proxying (`/api/stream/proxy`)**: Serves video and audio streams through an authenticated Next.js proxy with HMAC-SHA256 cryptographic signatures, 2-hour expiration timestamps, and strict hostname allowlisting (`*.googlevideo.com`, `archive.org`, etc.), preventing open proxy abuse and SSRF attacks.
-- **HTTP 206 Range Requests & Instant Cancellation**: Forwards HTTP `206 Partial Content` Range headers for smooth seeking, and wires client `AbortSignal` to immediately terminate upstream downloads when seeking or pausing.
-- **Emergency Official Player Fallback**: If a video is region-restricted or requires paid verification, provides an in-player fallback notice with one-click playback in the Official YouTube Player.
+### 🎬 Complete Video.js Playback Engine (Zero Embedded IFrames)
+- **100% Embedded-Free Architecture**: The YouTube Official IFrame Player and all embedded dependencies have been permanently removed. Playback is driven natively using **Video.js 8** with extracted and deciphered streams.
+- **Adaptive Video Quality Selection**: Dynamically switch resolutions on the fly (`1080p`, `720p`, `480p`, `360p`, `240p`, `144p`, up to `4K`/`2160p` when available) with seamless timestamp preservation.
+- **Subtitles & Closed Captions**: Available YouTube subtitle tracks (e.g. English, German, Japanese, Spanish, Portuguese) delivered in real-time WebVTT format via `/api/stream/captions`, with one-click CC toggle on the control bar and language selector in Settings.
+- **Playback Speed Controls**: Full speed range (`0.25x`, `0.5x`, `0.75x`, `Normal (1x)`, `1.25x`, `1.5x`, `1.75x`, `2x`) with synchronized audio pitch.
+- **Audio & Volume Controls**: Interactive volume button with dynamic state icons (high, low, muted), smooth hover slider, and `localStorage` persistence.
+- **Theater Mode & Fullscreen**: One-click Theater Mode (`t`) expands the player to full container width while pushing the queue and recommendations underneath; Fullscreen (`f`) leverages native browser Fullscreen API.
+- **YouTube Keyboard Shortcuts**:
+  - `Space` or `k`: Play / Pause toggle
+  - `ArrowLeft` / `j`: Jump backward 5s / 10s (with on-screen feedback badge)
+  - `ArrowRight` / `l`: Jump forward 5s / 10s (with on-screen feedback badge)
+  - `ArrowUp` / `ArrowDown`: Increase / Decrease volume by 5%
+  - `m`: Mute / Unmute toggle
+  - `f`: Fullscreen toggle
+  - `t`: Theater mode toggle
+  - `c`: Captions / Subtitles toggle
+  - `0` - `9`: Jump to 0% - 90% of duration
+- **Mobile & Desktop Seeking**: Double-tap on touch devices (or double-click on desktop) on the left/right half of the video to seek backward/forward 10 seconds.
+- **Dual-Track Synchronized Audio**: Adaptive DASH video streams (`avc1`/H.264) and audio streams (`mp4a`/AAC) are synchronized in lockstep with automatic sub-150ms drift correction.
+- **Secure Media Streaming Proxy (`/api/stream/proxy`)**: Streams are routed through an authenticated Next.js proxy with HMAC-SHA256 signatures, 2-hour expiration, SSRF defenses, and HTTP `206 Partial Content` Range requests.
 
 ### 📝 Authentic Video Descriptions & Metadata
-- **Complete Authentic Descriptions**: Extracts the authentic multi-line video descriptions directly from YouTube metadata and watch page responses (including timestamps, tracklists, social links, and credits).
+- **Complete Authentic Descriptions**: Extracts multi-line video descriptions directly from YouTube metadata and watch page responses (including timestamps, tracklists, social links, and credits).
 - **Interactive Formatting**: Parses URLs into clickable links (`<a href="..." target="_blank">`) with auto-wrapping (`whitespace-pre-wrap break-words`) that adapts cleanly across mobile, tablet, and desktop viewports.
 - **Expandable Description Card**: Clean collapsible box with view counts, relative timestamps, and one-click expand/collapse.
 
@@ -23,7 +39,7 @@ A modern, high-performance **YouTube Web Client** featuring an independent custo
 - **Real YouTube Search**: Live search queries YouTube directly, returning real video, channel, and playlist results with full metadata (views, length, channel name, thumbnails).
 - **Categorized Trending Feeds**: Dynamic categorized video feeds (Music, Gaming, News, Tech, Education, Sports, Entertainment) with live YouTube content.
 - **Full Channel Browsing & Pagination**: Channel profiles display high-resolution avatars, responsive banners, subscriber counts, video counts, and complete video grids with continuation pagination ("Load More Videos" in batches of 30).
-- **Clean Distraction-Free Experience**: Distraction-free watch experience with no comments section clutter.
+- **Distraction-Free Experience**: Distraction-free watch experience with no comments section clutter.
 - **Optional YouTube Data API v3 Quota**: If a `YOUTUBE_API_KEY` is provided, the client prioritizes official v3 endpoints with in-memory TTL/LRU quota caching.
 
 ### 📁 Complete Playlists Management & Queue
@@ -46,6 +62,7 @@ A modern, high-performance **YouTube Web Client** featuring an independent custo
 | :--- | :--- |
 | **Framework** | [Next.js 15](https://nextjs.org/) (App Router, Turbopack, React 19) |
 | **Language** | [TypeScript 5](https://www.typescriptlang.org/) (Strict Mode) |
+| **Video Player Library** | [Video.js 8](https://videojs.com/) with Custom YouTube Theme & Controls |
 | **Styling & UI** | [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/), Lucide Icons |
 | **Stream Extraction** | [@distube/ytdl-core](https://github.com/distubeteam/ytdl-core) & YouTube InnerTube |
 | **Database & ORM** | [Drizzle ORM](https://orm.drizzle.team/), [PGlite](https://pglite.electric-sql.com/) (Embedded WASM Postgres) & Postgres.js |
@@ -97,7 +114,6 @@ cp .env.example .env.local
 | :--- | :--- | :--- |
 | `DATABASE_URL` | Optional | External PostgreSQL connection URL. If omitted, uses embedded PGlite in `.data/pglite`. |
 | `YOUTUBE_API_KEY` | Optional | Google Cloud YouTube Data API v3 key for high-volume quota fallback. |
-| `NEXT_PUBLIC_DEFAULT_PLAYBACK_PROVIDER` | Optional | Default playback engine: `"html5"` (default) or `"embed"`. |
 | `STREAM_PROXY_SECRET` | Optional | Secret key used for signing stream proxy URLs (auto-generated if omitted). |
 
 ---
@@ -122,7 +138,7 @@ $ bun run test
 ✓ Channel subscriptions verified
 [5/5] Testing YouTube Service & Cache...
 ✓ Trending feed fetched (6 videos)
-✓ Video details & description verified: "..." (description: 578 chars)
-✓ Search verified (20 items)
+✓ Video details & description verified: "..." (description: 266 chars)
+✓ Search verified (19 items)
 === ALL TEST SUITES PASSED WITH 100% SUCCESS! ===
 ```

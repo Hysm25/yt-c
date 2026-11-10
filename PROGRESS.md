@@ -9,59 +9,75 @@
 
 ## 2. Completed Work & Architectural Upgrades
 
-### Task 1: Video Playback & Cipher Decryption Pipeline
-- **Problem Investigated**:
-  - Previously, YouTube videos failed direct playback with "Playback Available in Official Player" because modern YouTube splits high-definition video and audio into separate adaptive streams (DASH) and encrypts stream URLs with signature ciphers and `n`-parameter throttling.
-  - Progressive muxed MP4 streams (`itag 18` / `itag 22`) are no longer consistently provided by YouTube on many videos, causing old stream extractors looking only for progressive muxed streams to report `hasDirectStream: false`.
-- **Architectural Solution & Implementation**:
-  - **Cipher Decryption via `@distube/ytdl-core`**: In `src/app/api/stream/route.ts`, stream extraction uses `@distube/ytdl-core` with signature deciphering and `n`-parameter descrambling to resolve both high-definition video formats (`itag 137` 1080p, `itag 136` 720p, etc.) and native audio formats (`itag 140` 130kbps AAC).
-  - **Dual-Track Synchronized HTML5 Playback**: In `src/components/player/html5-player.tsx`, the native `<video controls>` element plays the video track while a synchronized hidden `<audio>` element plays the audio track. The component seamlessly synchronizes playback state, seeking, volume adjustments, playback rate changes, buffering, and track completion between video and audio in lockstep.
-  - **Secure Media Streaming Proxy (`/api/stream/proxy`)**:
-    - Proxies both video and audio stream chunks directly through Next.js route handlers, eliminating CORS issues and client IP binding restrictions.
-    - **SSRF & Cryptographic Defenses**: Enforces HMAC-SHA256 signature verification, a 2-hour expiration window, and strict domain allowlisting (`*.googlevideo.com`, `archive.org`, etc.). Blocks all loopback, RFC 1918 private IPs, and cloud metadata IPs.
-    - **Range Streaming & Connection Management**: Supports HTTP `206 Partial Content` Range requests (`bytes=...`) for smooth seeking and buffering, and passes `request.signal` (AbortSignal) to immediately abort upstream downloads when seeking or pausing.
-  - **Secondary Official Player Fallback**: For videos where raw streams are unavailable due to region restrictions or DRM, provides a clean in-player fallback notice with one-click playback in the Official YouTube Player.
+### Task 1: Complete Removal of YouTube Official Player & Embedded Dependencies
+- **Problem & Scope**:
+  - The user requested completely eliminating the YouTube Official Player, IFrame Player, and all embedded-player dependencies, without using the embedded player as a fallback.
+- **Implementation & Cleanup**:
+  - **Deleted Files**:
+    - `src/components/player/embed-player.tsx` (completely deleted).
+    - `src/components/player/html5-player.tsx` (superseded by modern Video.js engine in `video-player.tsx`).
+  - **Header & Navigation Decoupling**:
+    - Removed the "Active Player: Embed / HTML5" toggle button from `src/components/layout/header.tsx`.
+    - Removed `playbackProvider` state and handlers from `src/components/layout/shell.tsx`.
+  - **Settings Decoupling**:
+    - Removed the "Default Playback Engine" embed card from `src/app/settings/page.tsx`.
+  - **API Cleanliness**:
+    - Removed all `recommendedProvider: "embed"` fields from `src/app/api/stream/route.ts`.
 
 ---
 
-### Task 2: Video Descriptions Extraction & Formatting
-- **Problem Investigated**:
-  - Previously, `getVideoDetails` in `public-youtube-provider.ts` relied on `oEmbed` (which does not provide descriptions) and search snippet runs (which only provide 1-line truncated snippets), falling back to a dummy string `"Watch ${title} on YouTube Web Client."`.
-- **Architectural Solution & Implementation**:
-  - **Authentic Description Extraction**: `getVideoDetails` now extracts full multi-line descriptions directly using `Ytdl` video metadata and watch page HTML `shortDescription` regex parsing.
-  - **Interactive Formatting in `src/components/video/video-info.tsx`**:
-    - Multi-line descriptions format URLs as clickable links (`<a href="..." target="_blank" rel="noopener noreferrer">`).
-    - Uses `whitespace-pre-wrap break-words` so long text, links, and timestamps wrap cleanly without breaking layouts on mobile devices.
-    - Expandable description card with view count, relative timestamp, and interactive collapse/expand toggle.
-
----
-
-### Task 3: Complete Removal of Comments
-- **Scope & Cleanup**:
-  - Completely removed all comments and replies functionality across UI components, API routes, database code, and provider interfaces.
-- **Files Deleted & Cleaned Up**:
-  - Deleted `src/components/comments/` (`comment-section.tsx`, `comment-item.tsx`).
-  - Deleted `src/app/api/youtube/comments/` (`route.ts`).
-  - Removed `YouTubeComment` interface from `src/services/youtube/types.ts`.
-  - Removed `getVideoComments` from `IYouTubeDataProvider` (`provider-interface.ts`), `service-factory.ts`, `official-api-provider.ts`, `mock-provider.ts`, and `public-youtube-provider.ts`.
-  - Removed `getCommentReplies` and `queryInnerTubeNext` from `public-youtube-provider.ts`.
-  - Removed `<CommentSection>` from `src/app/watch/page.tsx`.
-  - Cleaned up test suite in `src/test/run-tests.ts`.
-
----
-
-### Task 4: Complete Authentication Removal & Pure Guest Architecture
+### Task 2: Video.js JavaScript Video Player Engine
 - **Implementation**:
-  - Uninstalled `next-auth` and removed all OAuth routes, callbacks, and session providers.
-  - Removed orphaned NextAuth database tables from `src/db/schema.ts`.
-  - Implemented anonymous visitor cookie sessions (`yt_guest_id` = `guest_${UUID}`) via `src/lib/guest-session.ts`, isolating watch history, playlists, liked videos, subscriptions, and settings per visitor without accounts.
-  - Created `subscriptions` schema and repository methods for interactive one-click channel subscriptions.
+  - Installed and integrated **Video.js 8.24.2** (`video.js`) in `src/components/player/video-player.tsx`.
+  - **Video Quality Selection**:
+    - Dynamically queries available resolutions from `/api/stream?id=...` (`qualities: [{ label, height, itag, streamUrl }]`).
+    - Settings popover menu allows users to select resolutions (`1080p`, `720p`, `480p`, `360p`, `240p`, `144p`, up to `4K`).
+    - Quality switching preserves current playback timestamp (`player.currentTime()`) and resume state without interrupting playback.
+  - **Subtitles & Closed Captions**:
+    - Created dedicated WebVTT delivery endpoint: `/api/stream/captions?id=...&lang=...` with 24-hour caching.
+    - Extracted available subtitle tracks (English, German, Japanese, Spanish, etc.) from YouTube.
+    - Control bar includes a quick CC toggle with active underline indicator, and Settings popover has a dedicated Subtitles menu to select individual languages or Off.
+  - **Playback Speed Controls**:
+    - Settings menu option for playback speed (`0.25x`, `0.5x`, `0.75x`, `Normal (1x)`, `1.25x`, `1.5x`, `1.75x`, `2x`).
+    - Adjusts both video and synchronized audio speed in lockstep.
+  - **Audio & Volume Controls**:
+    - Interactive volume button with dynamic state icons (`Volume2`, `Volume1`, `VolumeX`).
+    - Smooth hover/touch volume slider with persistent storage in `localStorage`.
+    - Dual-track audio synchronization: DASH adaptive YouTube video streams and audio streams are played in real time with sub-150ms drift correction.
+  - **Theater Mode & Fullscreen**:
+    - Fullscreen toggle using native Fullscreen API (`f` shortcut).
+    - Theater Mode toggle (`t` shortcut): expands player to full container width (`max-w-[1700px]`), pushing queue and recommendations underneath. Preference is saved to `localStorage`.
+  - **YouTube Keyboard Shortcuts**:
+    - `Space` / `k`: Play / Pause toggle
+    - `ArrowLeft` / `j`: Jump backward 5s / 10s
+    - `ArrowRight` / `l`: Jump forward 5s / 10s
+    - `ArrowUp` / `ArrowDown`: Volume +/- 5%
+    - `m`: Mute / Unmute
+    - `f`: Fullscreen
+    - `t`: Theater Mode
+    - `c`: Captions toggle
+    - `0` - `9`: Seek to 0% - 90%
+    - Center feedback ripple pill displays brief on-screen indicator for all actions.
+  - **Seeking & Buffering**:
+    - YouTube red progress scrubber with buffer bar and hover time tooltip.
+    - Animated center buffering spinner.
+    - Double-tap on mobile or double-click on desktop on the left/right half to seek 10s backward/forward.
+    - Auto-hides controls after 2.6s of inactivity during playback.
 
 ---
 
-### Task 5: Package Manager Migration to Bun & EGM Architectural Audit
-- **Bun Migration**: Installed Bun 1.4.4, created `bun.lock`, removed `pnpm-lock.yaml`, updated `package.json` scripts to use Bun.
-- **EGM Audit**: Installed Elephant-Goldfish Model plugin, created design spec (`docs/designs/architecture_redesign_and_migration.md`), ran adversarial review via Goldfish Design Critic, and addressed all security/architectural findings (HMAC proxy signing, host allowlisting, SSRF protection, AbortSignal handling).
+### Task 3: Video Descriptions Extraction & Formatting
+- **Implementation**:
+  - `getVideoDetails` in `public-youtube-provider.ts` extracts authentic multi-line descriptions directly via Ytdl video metadata with fallback to watch page HTML regex (`shortDescription`).
+  - Enhanced `src/components/video/video-info.tsx`: URLs are automatically parsed into interactive clickable links (`<a href="..." target="_blank">`), formatted with `whitespace-pre-wrap break-words`, and wrapped in an expandable toggle card.
+
+---
+
+### Task 4: Complete Removal of Comments
+- **Cleanup**:
+  - Deleted all comment components (`src/components/comments/`).
+  - Deleted comments API route (`src/app/api/youtube/comments/route.ts`).
+  - Removed comment types, provider methods, and UI references.
 
 ---
 
@@ -77,12 +93,14 @@
      - Media stream proxy cryptography & SSRF defenses verified
      - Database repository (settings, watch history, playlists, cascade deletion, likes) verified
      - Channel subscriptions repository verified
-     - YouTube service & cache verified (including video details & description verification)
+     - YouTube service & cache verified
 3. **Production Build**:
    - Command: `bun run build` (`next build`)
-   - Result: Compiled successfully in Next.js 15.5.29; 20/20 static and dynamic routes compiled and optimized.
+   - Result: Compiled successfully in Next.js 15.5.29; 21/21 static and dynamic routes compiled and optimized.
 4. **Live Runtime & Browser Verification**:
    - Next.js server launched on port 3000.
-   - Tested cipher-protected video stream extraction (`/api/stream?id=dQw4w9WgXcQ`): successfully returned `hasDirectStream: true`, 1080p stream URL, and 140 audio URL.
-   - Tested media proxy streaming (`/api/stream/proxy`): HTTP `206 Partial Content` Range requests verified with exact byte ranges (`video/mp4` and `audio/mp4`).
-   - Tested authentic description extraction (`/api/youtube/video/dQw4w9WgXcQ` and `jNQXAC9IVRw`): full 2,376-character and 264-character authentic descriptions verified.
+   - Verified `/api/stream?id=dQw4w9WgXcQ`: returned `hasDirectStream: true`, 8 available qualities (2160p to 144p), 6 caption tracks, and audio stream.
+   - Verified `/api/stream/captions?id=dQw4w9WgXcQ&lang=en`: returned HTTP 200 `text/vtt; charset=utf-8` (4,017 chars).
+   - Verified `/api/stream/captions?id=dQw4w9WgXcQ&lang=de-DE`: returned HTTP 200 `text/vtt; charset=utf-8` (3,766 chars).
+   - Verified 1080p and 480p proxy stream byte ranges: HTTP 206 Partial Content Range streaming confirmed.
+   - Verified Watch page HTML: zero embedded iframes or youtube-nocookie scripts loaded.

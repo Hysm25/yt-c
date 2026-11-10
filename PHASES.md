@@ -26,26 +26,22 @@
 - [x] Implement in-memory/database caching strategy for API requests and extracted streams
 - [x] Complete removal of all comment features, components, API endpoints, and types for a clean, distraction-free client
 
-## Phase 4: Native Browser HTML5 Video Player & Cipher Decryption Pipeline
-- [x] Implement Native Browser HTML5 `<video controls>` Player as primary player:
-  - [x] Default browser native controls and appearance (play/pause, scrubber, volume, fullscreen, playback speed)
-  - [x] Signature cipher and `n`-parameter decryption via `@distube/ytdl-core`
-  - [x] Support for 1080p, 720p, 480p, 360p video streams with dual-track synchronized audio
-  - [x] Next.js Media Streaming Proxy (`/api/stream/proxy`) with HMAC-SHA256 URL signing and 2-hour expiration
-  - [x] SSRF defenses: Host allowlisting (`*.googlevideo.com`, `archive.org`) and blocking of private/cloud metadata IPs
-  - [x] HTTP 206 Partial Content Range streaming and AbortSignal cancellation on seek/pause
-  - [x] Clean in-player fallback card with one-click switch to YouTube Player for restricted/DRM videos
-  - [x] Watch progress tracking to local history via `onTimeUpdate`
-  - [x] Auto-advance / Autoplay transition via `onEnded`
-- [x] Implement dual Playback Provider system:
-  - [x] Direct Stream Provider: native HTML5 `<video controls>` for direct media
-  - [x] Official YouTube IFrame Provider: privacy-enhanced embed (`youtube-nocookie.com`) as secondary fallback
-  - [x] In-player engine toggle enabling instant switching between Native `<video>` and YouTube Player
-- [x] Verify playback across direct streams, cipher-protected videos, and watch history synchronization
+## Phase 4: Video.js JavaScript Player Engine (Zero Embedded IFrames)
+- [x] Completely remove YouTube Official Player, IFrame Player (`embed-player.tsx`), and all embedded dependencies
+- [x] Implement full-featured **Video.js 8** player engine (`src/components/player/video-player.tsx`):
+  - [x] Adaptive Video Quality Selection (`1080p`, `720p`, `480p`, `360p`, `240p`, `144p`, up to `4K`) with seamless source switching
+  - [x] Subtitles and Closed Captions: Real-time WebVTT stream delivery via `/api/stream/captions`, CC toggle, and language selector
+  - [x] Playback Speed Controls (`0.25x` to `2x`) with synchronized audio pitch
+  - [x] Audio and Volume Controls with dynamic icons, volume slider, mute toggle, and `localStorage` persistence
+  - [x] Fullscreen API integration and responsive Theater Mode toggle
+  - [x] Full YouTube Keyboard Shortcuts (`Space`/`k`, `j`/`l`, `ArrowLeft`/`ArrowRight`, `ArrowUp`/`ArrowDown`, `m`, `f`, `t`, `c`, `0`-`9`)
+  - [x] Seeking, buffering spinner, double-tap seek (10s), and visual feedback ripple pills
+  - [x] Dual-track synchronized audio track with sub-150ms drift correction
+  - [x] Next.js Media Streaming Proxy (`/api/stream/proxy`) with HMAC-SHA256 signatures and HTTP `206 Partial Content` Range requests
 
 ## Phase 5: Client User Experience & Pages
 - [x] Home Page (`/`): Category chips, video feed cards with duration, views, relative timestamp, and channel avatar
-- [x] Watch Page (`/watch?v=...`): Native player view, expandable description with clickable URLs, channel info, subscribe/like actions, and related video suggestions
+- [x] Watch Page (`/watch?v=...`): Video.js player, Theater Mode responsive layout, expandable description with clickable URLs, channel info, subscribe/like actions, and playlist queue / related videos
 - [x] Search Page (`/search?q=...`): Rich result cards (videos, channels, playlists), filters, and sort options
 - [x] Channel Page (`/channel/[id]`): High-res channel avatar, responsive banner (up to 2560px), subscriber & video counters, About tab, and full video pagination
 - [x] Subscriptions Page (`/subscriptions`): Channel subscriptions list and latest uploads feed with zero account requirements
@@ -55,7 +51,7 @@
   - [x] Add and remove videos (via Watch page Save dialog and Playlist detail view)
   - [x] View playlists with video counts and cascade deletion
   - [x] Play videos from playlist with active Playlist Queue panel and automated next-track playback transition on Watch page
-- [x] Settings Page (`/settings`): Configure preferred playback provider, custom API key, theme preferences, and data clear options
+- [x] Settings Page (`/settings`): Configure preferred default quality, autoplay, custom API key, theme preferences, and data clear options
 - [x] Header & Navigation: Full-width expandable mobile search, slide-out mobile drawer with backdrop, and UserMenu
 
 ## Phase 6: Package Manager Migration to Bun & EGM Architectural Audit

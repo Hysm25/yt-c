@@ -9,8 +9,6 @@ import {
   X,
   Sun,
   Moon,
-  Tv,
-  Film,
   Sliders,
   ArrowLeft,
 } from "lucide-react";
@@ -21,14 +19,10 @@ import { UserMenu } from "./user-menu";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
-  playbackProvider: "html5" | "embed";
-  onTogglePlaybackProvider: () => void;
 }
 
 export function Header({
   onToggleSidebar,
-  playbackProvider,
-  onTogglePlaybackProvider,
 }: HeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -164,27 +158,6 @@ export function Header({
           className="flex sm:hidden text-foreground hover:bg-accent"
         >
           <Search className="h-5 w-5" />
-        </Button>
-
-        {/* Playback Mode Switcher */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onTogglePlaybackProvider}
-          title={`Active Player: ${playbackProvider.toUpperCase()}. Click to switch between HTML5 Native and Official YouTube Embed.`}
-          className="hidden md:inline-flex items-center gap-1.5 text-xs font-normal border-border/80 hover:border-primary/50"
-        >
-          {playbackProvider === "html5" ? (
-            <>
-              <Film className="h-3.5 w-3.5 text-red-500" />
-              <span>HTML5</span>
-            </>
-          ) : (
-            <>
-              <Tv className="h-3.5 w-3.5 text-blue-500" />
-              <span>Embed</span>
-            </>
-          )}
         </Button>
 
         {/* Theme Toggle */}

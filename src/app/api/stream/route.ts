@@ -92,6 +92,8 @@ export async function GET(request: Request) {
         audioUrl: null,
         format: "mp4",
         quality: "original",
+        qualities: [{ label: "Original", height: 720, itag: 0, streamUrl: directUrl }],
+        captions: [],
         hasDirectStream: true,
       });
     }
@@ -116,12 +118,14 @@ export async function GET(request: Request) {
         audioUrl: null,
         format: videoId.endsWith(".webm") ? "webm" : "mp4",
         quality: "direct",
+        qualities: [{ label: "Direct", height: 720, itag: 0, streamUrl: videoId }],
+        captions: [],
         hasDirectStream: true,
       });
     }
 
     // Check memory cache
-    const cacheKey = `stream:${videoId}`;
+    const cacheKey = `stream_v2:${videoId}`;
     const cached = apiCache.get<any>(cacheKey);
     if (cached) {
       return NextResponse.json(cached);
@@ -131,42 +135,30 @@ export async function GET(request: Request) {
     try {
       const info = await ytdl.getInfo(videoId);
 
-      // Check for progressive format with both audio and video
-      const muxedFormats = info.formats.filter(
-        (f) => f.hasVideo && f.hasAudio && f.container === "mp4" && f.url
+      // Extract all available video formats (mp4/h264)
+      const videoFormats = info.formats.filter(
+        (f) => f.hasVideo && f.container === "mp4" && f.url && f.height
       );
 
-      if (muxedFormats.length > 0) {
-        muxedFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
-        const best = muxedFormats[0];
-        if (best.url) {
-          const signedProxyUrl = signProxyUrl(best.url, 7200);
-
-          const responsePayload = {
-            success: true,
-            hasDirectStream: true,
-            streamUrl: signedProxyUrl,
-            audioUrl: null,
-            quality: best.qualityLabel || `${best.height}p` || "720p",
-            itag: best.itag,
-            format: "mp4",
-            isProxied: true,
-          };
-
-          apiCache.set(cacheKey, responsePayload, 1800);
-          return NextResponse.json(responsePayload);
+      // Deduplicate qualities by label/height, selecting highest bitrate
+      const qualityMap = new Map<string, any>();
+      for (const f of videoFormats) {
+        const label = f.qualityLabel || `${f.height}p`;
+        if (!qualityMap.has(label) || (f.bitrate || 0) > (qualityMap.get(label).bitrate || 0)) {
+          qualityMap.set(label, f);
         }
       }
 
-      // Check for adaptive formats (separate video and audio streams)
-      const videoFormats = info.formats.filter(
-        (f) => f.hasVideo && f.container === "mp4" && f.url
-      );
-      videoFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
-      // Prioritize <= 1080p for stable browser HTML5 hardware decoding
-      const bestVideo =
-        videoFormats.find((f) => (f.height || 0) <= 1080) || videoFormats[0];
+      const qualities = Array.from(qualityMap.values())
+        .sort((a, b) => (b.height || 0) - (a.height || 0))
+        .map((f) => ({
+          label: f.qualityLabel || `${f.height}p`,
+          height: f.height || 720,
+          itag: f.itag,
+          streamUrl: signProxyUrl(f.url, 7200),
+        }));
 
+      // Extract best audio stream
       const audioFormats = info.formats.filter(
         (f) =>
           !f.hasVideo &&
@@ -176,19 +168,41 @@ export async function GET(request: Request) {
       );
       audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
       const bestAudio = audioFormats[0];
+      const signedAudioUrl = bestAudio?.url ? signProxyUrl(bestAudio.url, 7200) : null;
 
-      if (bestVideo && bestAudio && bestVideo.url && bestAudio.url) {
-        const signedVideoUrl = signProxyUrl(bestVideo.url, 7200);
-        const signedAudioUrl = signProxyUrl(bestAudio.url, 7200);
+      // Check for progressive format with both audio and video
+      const muxedFormats = info.formats.filter(
+        (f) => f.hasVideo && f.hasAudio && f.container === "mp4" && f.url
+      );
+      if (muxedFormats.length > 0) {
+        muxedFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
+      }
 
+      // Extract available caption tracks
+      const captions = (info.captionTracks || []).map((t) => ({
+        languageCode: t.languageCode,
+        name: t.name,
+        isDefault: !!t.isDefault,
+        url: `/api/stream/captions?id=${encodeURIComponent(videoId)}&lang=${encodeURIComponent(
+          t.languageCode
+        )}`,
+      }));
+
+      // Determine default stream: prefer 1080p or 720p or highest available <= 1080p
+      const defaultVideo =
+        qualities.find((q) => q.height <= 1080) || qualities[0];
+
+      if (defaultVideo) {
         const responsePayload = {
           success: true,
           hasDirectStream: true,
-          streamUrl: signedVideoUrl,
+          streamUrl: defaultVideo.streamUrl,
           audioUrl: signedAudioUrl,
-          quality: bestVideo.qualityLabel || `${bestVideo.height}p` || "1080p",
-          itag: bestVideo.itag,
-          audioItag: bestAudio.itag,
+          quality: defaultVideo.label,
+          itag: defaultVideo.itag,
+          audioItag: bestAudio?.itag,
+          qualities: qualities.length > 0 ? qualities : [defaultVideo],
+          captions,
           format: "mp4",
           isProxied: true,
         };
@@ -204,13 +218,23 @@ export async function GET(request: Request) {
     const fallbackExtracted = await extractProgressiveStreamFallback(videoId);
     if (fallbackExtracted && fallbackExtracted.url) {
       const signedProxyUrl = signProxyUrl(fallbackExtracted.url, 7200);
+      const qualityLabel = fallbackExtracted.qualityLabel || "360p";
       const responsePayload = {
         success: true,
         hasDirectStream: true,
         streamUrl: signedProxyUrl,
         audioUrl: null,
-        quality: fallbackExtracted.qualityLabel || "360p",
+        quality: qualityLabel,
         itag: fallbackExtracted.itag,
+        qualities: [
+          {
+            label: qualityLabel,
+            height: 360,
+            itag: fallbackExtracted.itag,
+            streamUrl: signedProxyUrl,
+          },
+        ],
+        captions: [],
         format: "mp4",
         isProxied: true,
       };
@@ -228,6 +252,8 @@ export async function GET(request: Request) {
         audioUrl: null,
         format: "mp4",
         quality: "720p",
+        qualities: [{ label: "720p", height: 720, itag: 22, streamUrl: openFixture }],
+        captions: [],
         hasDirectStream: true,
         isTestFixture: true,
       });
@@ -237,9 +263,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       hasDirectStream: false,
-      recommendedProvider: "embed",
       message:
-        "Direct stream is unavailable for this video. Use the official player fallback for playback.",
+        "Direct stream is unavailable for this video. This video may be private, age-restricted, or region-locked.",
     });
   } catch (error: any) {
     console.error("GET /api/stream error:", error);

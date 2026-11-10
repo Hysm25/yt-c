@@ -3,14 +3,13 @@
 import React, { useState, useEffect } from "react";
 import {
   Sliders,
-  Film,
-  Tv,
   Key,
   Palette,
   Trash2,
   Check,
   User,
   ShieldCheck,
+  PlaySquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -19,7 +18,6 @@ import { useTheme } from "@/components/providers/theme-provider";
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
 
-  const [provider, setProvider] = useState<"html5" | "embed">("html5");
   const [apiKey, setApiKey] = useState("");
   const [autoplay, setAutoplay] = useState(true);
   const [quality, setQuality] = useState("auto");
@@ -31,7 +29,6 @@ export default function SettingsPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.settings) {
-          setProvider(data.settings.defaultPlaybackProvider || "html5");
           setAutoplay(data.settings.autoplay !== false);
           setQuality(data.settings.defaultQuality || "auto");
           setApiKey(data.settings.customApiKey || "");
@@ -48,17 +45,12 @@ export default function SettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          defaultPlaybackProvider: provider,
+          defaultPlaybackProvider: "videojs",
           autoplay,
           defaultQuality: quality,
           customApiKey: apiKey.trim() || null,
         }),
       });
-
-      localStorage.setItem("yt-playback-provider", provider);
-      window.dispatchEvent(
-        new CustomEvent("yt-playback-provider-changed", { detail: provider })
-      );
 
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
@@ -119,63 +111,17 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={handleSave} className="flex flex-col gap-6">
-        {/* Playback Provider Section */}
+        {/* Playback Engine Information */}
         <div className="flex flex-col gap-3 rounded-2xl border bg-secondary/30 p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Default Playback Engine
-          </h2>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Choose your preferred video player. The Native HTML5 engine uses the browser&apos;s standard player controls,
-            while the YouTube Embed engine provides an official fallback for cipher-restricted streams.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            {/* HTML5 Option */}
-            <div
-              onClick={() => setProvider("html5")}
-              className={`cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all ${
-                provider === "html5"
-                  ? "border-red-500 bg-red-500/10 shadow-xs"
-                  : "hover:bg-secondary/50 border-border"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-semibold text-sm">
-                  <Film className="h-4 w-4 text-blue-500" />
-                  <span>Native HTML5 Player (Default)</span>
-                </div>
-                {provider === "html5" && (
-                  <Check className="h-4 w-4 text-red-500" />
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Uses the browser&apos;s native &lt;video controls&gt; element for direct media playback.
-              </p>
-            </div>
-
-            {/* Embed Option */}
-            <div
-              onClick={() => setProvider("embed")}
-              className={`cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all ${
-                provider === "embed"
-                  ? "border-red-500 bg-red-500/10 shadow-xs"
-                  : "hover:bg-secondary/50 border-border"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-semibold text-sm">
-                  <Tv className="h-4 w-4 text-red-500" />
-                  <span>Official YouTube Player</span>
-                </div>
-                {provider === "embed" && (
-                  <Check className="h-4 w-4 text-red-500" />
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Official YouTube player iframe ensuring 100% video and audio compatibility.
-              </p>
-            </div>
+          <div className="flex items-center gap-2">
+            <PlaySquare className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              JavaScript Video Player Engine
+            </h2>
           </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Powered by modern Video.js with dynamic YouTube stream deciphering, adaptive quality selection (1080p, 720p, 480p, 360p), closed captions, playback speed, synchronized dual-track audio, theater mode, and full keyboard shortcut support. No third-party embedded IFrames or YouTube official player scripts are loaded.
+          </p>
         </div>
 
         {/* Playback Preferences */}

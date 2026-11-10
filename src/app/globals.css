@@ -1,3 +1,4 @@
+@import "video.js/dist/video-js.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -112,3 +113,88 @@ input[type="range"]::-moz-range-thumb {
   border: none;
   cursor: pointer;
 }
+
+/* Video.js YouTube Player Theme Overrides */
+.video-js {
+  width: 100% !important;
+  height: 100% !important;
+  font-family: inherit !important;
+}
+
+.video-js .vjs-tech {
+  object-fit: contain !important;
+}
+
+.video-js .vjs-big-play-button {
+  background-color: rgba(20, 20, 20, 0.8) !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 64px !important;
+  height: 64px !important;
+  line-height: 64px !important;
+  margin-top: -32px !important;
+  margin-left: -32px !important;
+  font-size: 2.5em !important;
+  transition: all 0.2s ease !important;
+}
+
+.video-js:hover .vjs-big-play-button {
+  background-color: #ff0000 !important;
+  transform: scale(1.1);
+}
+
+.video-js .vjs-control-bar {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.88), rgba(0, 0, 0, 0.3) 60%, transparent) !important;
+  height: 48px !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 8px !important;
+}
+
+.video-js .vjs-play-progress {
+  background-color: #ff0000 !important;
+}
+
+.video-js .vjs-play-progress:before {
+  color: #ff0000 !important;
+  font-size: 13px !important;
+  top: -4px !important;
+}
+
+.video-js .vjs-load-progress {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+.video-js .vjs-load-progress div {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+.video-js .vjs-slider {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.video-js .vjs-volume-level {
+  background-color: #ffffff !important;
+}
+
+/* YouTube Style Closed Caption Text Tracks */
+.video-js .vjs-text-track-display {
+  pointer-events: none !important;
+}
+
+.video-js .vjs-text-track-cue {
+  background: none !important;
+}
+
+.video-js .vjs-text-track-cue > div {
+  background-color: rgba(8, 8, 8, 0.78) !important;
+  color: #ffffff !important;
+  font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+  font-weight: 500 !important;
+  font-size: 1.1em !important;
+  line-height: 1.4 !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6) !important;
+}
+
