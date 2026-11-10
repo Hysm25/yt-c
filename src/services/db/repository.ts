@@ -152,9 +152,14 @@ export const repository = {
   },
 
   async deletePlaylist(userId: string, playlistId: string) {
+    // Delete playlist items first to ensure cleanliness
+    await db
+      .delete(playlistItems)
+      .where(eq(playlistItems.playlistId, playlistId));
+
     return await db
       .delete(playlists)
-      .where(and(eq(playlists.id, userId), eq(playlists.id, playlistId)));
+      .where(and(eq(playlists.userId, userId), eq(playlists.id, playlistId)));
   },
 
   async addPlaylistItem(playlistId: string, item: PlaylistItemInput) {
