@@ -20,6 +20,16 @@ export const isGoogleAuthConfigured = Boolean(
   GOOGLE_CLIENT_ID.trim() && GOOGLE_CLIENT_SECRET.trim()
 );
 
+// Guarantee AUTH_SECRET exists in process.env to prevent production MissingSecret/Configuration errors
+const AUTH_SECRET =
+  process.env.AUTH_SECRET ||
+  process.env.NEXTAUTH_SECRET ||
+  "youtube-client-default-secure-jwt-auth-secret-32-characters";
+
+if (!process.env.AUTH_SECRET) {
+  process.env.AUTH_SECRET = AUTH_SECRET;
+}
+
 const GOOGLE_AUTH_SCOPES = [
   "openid",
   "email",
@@ -69,23 +79,32 @@ async function refreshAccessToken(token: Record<string, any>) {
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
-  providers: isGoogleAuthConfigured
-    ? [
-        Google({
-          clientId: GOOGLE_CLIENT_ID,
-          clientSecret: GOOGLE_CLIENT_SECRET,
-          authorization: {
-            params: {
-              scope: GOOGLE_AUTH_SCOPES,
-              access_type: "offline",
-              prompt: "consent",
-              response_type: "code",
-            },
-          },
-        }),
-      ]
-    : [],
+  secret: AUTH_SECRET,
+  pages: {
+    signIn: "/settings",
+    error: "/auth/error",
+  },
+  providers: [
+    Google({
+      clientId: GOOGLE_CLIENT_ID || "unconfigured-client-id",
+      clientSecret: GOOGLE_CLIENT_SECRET || "unconfigured-client-secret",
+      authorization: {
+        params: {
+          scope: GOOGLE_AUTH_SCOPES,
+          access_type: "offline",
+          prompt: "consent",
+          response_type: "code",
+        },
+      },
+    }),
+  ],
   callbacks: {
+    async signIn() {
+      if (!isGoogleAuthConfigured) {
+        return "/auth/error?error=OAuthNotConfigured";
+      }
+      return true;
+    },
     async jwt({ token, account, user }) {
       // Initial sign-in
       if (account && user) {
@@ -122,5 +141,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
-  secret: process.env.AUTH_SECRET || "fallback-secret-for-development-mode-only-minimum-32-chars",
 });

@@ -43,15 +43,23 @@ export function HTML5Player({
         if (data.hasDirectStream && data.streamUrl) {
           setStreamUrl(data.streamUrl);
         } else {
-          setStreamError(
-            data.message ||
-              "YouTube signature cipher prevents direct HTML5 <video> streaming for this video."
-          );
+          // Whenever native direct playback is unsupported, automatically fall back to the official YouTube Player
+          if (onSwitchToEmbed) {
+            onSwitchToEmbed();
+          } else {
+            setStreamError(
+              "Direct stream is unavailable for this video. Use the YouTube Player for playback."
+            );
+          }
         }
       })
       .catch((err) => {
         if (isCancelled) return;
-        setStreamError(err.message || "Failed to load video stream.");
+        if (onSwitchToEmbed) {
+          onSwitchToEmbed();
+        } else {
+          setStreamError("Unable to load video stream in native player.");
+        }
       })
       .finally(() => {
         if (!isCancelled) setLoading(false);
@@ -60,7 +68,7 @@ export function HTML5Player({
     return () => {
       isCancelled = true;
     };
-  }, [videoId]);
+  }, [videoId, onSwitchToEmbed]);
 
   // Set initial progress timestamp if resuming
   useEffect(() => {
@@ -102,7 +110,7 @@ export function HTML5Player({
     );
   }
 
-  // If YouTube cipher protection prevents native <video> streaming
+  // Fallback notice if stream is unavailable in native mode
   if (!streamUrl || streamError) {
     return (
       <div className="relative flex aspect-video w-full flex-col items-center justify-center rounded-2xl bg-zinc-950 border border-zinc-800 p-6 text-center text-white shadow-xl overflow-hidden">
@@ -114,14 +122,14 @@ export function HTML5Player({
           />
         )}
         <div className="relative z-10 flex flex-col items-center max-w-md">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 mb-3">
-            <AlertCircle className="h-6 w-6" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-600/10 text-red-500 mb-3">
+            <Film className="h-6 w-6" />
           </div>
           <h3 className="text-base sm:text-lg font-bold mb-1.5">
-            Cipher-Protected YouTube Stream
+            Playback Available in Official Player
           </h3>
           <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-            YouTube restricts raw MP4/WebM streaming for this video using signature ciphers. The browser&apos;s native <code className="text-zinc-200">&lt;video&gt;</code> player cannot decrypt googlevideo streams without YouTube&apos;s player.
+            Direct MP4 streaming is not provided by YouTube for this video. Switch to the Official YouTube Player for full video and audio playback.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             {onSwitchToEmbed && (
@@ -160,6 +168,9 @@ export function HTML5Player({
         controls
         autoPlay
         playsInline
+        onError={() => {
+          if (onSwitchToEmbed) onSwitchToEmbed();
+        }}
         onEnded={onEnded}
         onTimeUpdate={handleTimeUpdate}
         className="h-full w-full object-contain"

@@ -9,18 +9,19 @@ A modern, full-featured **YouTube Web Client** featuring an independent custom u
 ### 🎬 Video Playback & Dual-Engine Architecture
 - **Native Browser HTML5 Player (`<video controls>`)**: Uses the browser's default HTML5 `<video controls>` player with native appearance and behavior. No custom player interface or unmaintainable UI overlays; keeps only the functionality necessary to load and play videos.
 - **Official YouTube Player Engine**: Privacy-enhanced YouTube IFrame embed (`youtube-nocookie.com`) ensuring 100% video playback compatibility for YouTube cipher-protected videos with automated progress synchronization and next-video advancement.
-- **Honest Playback Handling**: Streams that can be played natively use `<video controls>`. For cipher-protected YouTube streams where direct MP4 streaming is restricted by YouTube's DRM/ciphers, the client provides clear notification and one-click playback in the YouTube Player.
+- **Seamless Playback Fallbacks**: Direct streams play natively. For cipher-protected YouTube streams where direct MP4 streaming is restricted by YouTube signature ciphers, the player automatically switches to the YouTube embed player without displaying confusing error messages. If a video is creator-restricted from third-party embedding, a clean notice with a direct YouTube link is displayed.
 - **Instant Engine Switching**: Switch between the Native Browser Player and the Official YouTube Player directly in the player header or globally from the top navigation.
 
 ### 🌐 Live YouTube Data Integration (Zero API Key Requirement)
 - **Real YouTube Search**: Live search queries YouTube directly, returning actual video, channel, and playlist results with full metadata (views, length, channel name, thumbnails).
 - **Real Trending Feeds**: Dynamic categorized video feeds (Music, Gaming, News, Tech, Education, Sports, Entertainment) with live YouTube content instead of hardcoded mock data.
+- **Full Channel Browsing & Pagination**: Channel profiles display high-resolution avatars, responsive banners (up to 2560px), subscriber counts, video counts, and complete video grids with continuation pagination ("Load More Videos" in batches of 30).
 - **Official YouTube Data API v3 Support**: If a `YOUTUBE_API_KEY` is provided, the client prioritizes official v3 endpoints with in-memory TTL/LRU quota caching.
 - **Offline Fallback Resilience**: If network access is completely offline, the client automatically falls back to local sample content so the application remains runnable.
 
 ### 🔐 Authentication, Navigation & User Persistence
 - **Auth.js (NextAuth v5) with Google OAuth**: Interactive account menu supporting Google sign-in with automatic YouTube scopes (`youtube.readonly`, `youtube.force-ssl`).
-- **Resilient OAuth Validation**: If Google credentials (`AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`) are not set, the app gracefully guides the user with a setup dialog rather than breaking with a Google `400: Missing required parameter: client_id` error.
+- **Resilient OAuth Validation & Dedicated Error Recovery**: If Google credentials (`AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`) are not set or unconfigured, the app gracefully guides the user with a dedicated `/auth/error` page and setup instructions rather than breaking with configuration errors.
 - **Zero-Daemon Local Database**: Embedded **PGlite** (WebAssembly PostgreSQL) operates inside `.data/pglite` without requiring Docker or a running PostgreSQL daemon.
 - **External PostgreSQL Support**: Connects to external PostgreSQL (e.g. Supabase, Neon, AWS RDS) by setting `DATABASE_URL`.
 - **Guest Mode**: Full local persistence for watch history, custom playlists, liked videos, and settings without requiring login.

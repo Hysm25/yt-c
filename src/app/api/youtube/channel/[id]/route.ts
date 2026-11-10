@@ -10,12 +10,16 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const pageToken = searchParams.get("pageToken") || undefined;
 
-    const channel = await youtubeService.getChannelDetails(id);
-    if (!channel) {
+    // When paginating with pageToken, avoid re-fetching channel metadata
+    const [channel, videos] = await Promise.all([
+      pageToken ? Promise.resolve(null) : youtubeService.getChannelDetails(id),
+      youtubeService.getChannelVideos(id, pageToken),
+    ]);
+
+    if (!pageToken && !channel) {
       return NextResponse.json({ error: "Channel not found" }, { status: 404 });
     }
 
-    const videos = await youtubeService.getChannelVideos(id, pageToken);
     return NextResponse.json({ channel, videos });
   } catch (error: any) {
     console.error("GET /api/youtube/channel/[id] error:", error);

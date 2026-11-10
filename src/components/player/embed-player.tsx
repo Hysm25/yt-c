@@ -26,10 +26,16 @@ export function EmbedPlayer({
   onSwitchToHtml5,
 }: EmbedPlayerProps) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [isRestricted, setIsRestricted] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const lastRecordedTimeRef = useRef<number>(0);
 
   const startTime = Math.floor(initialProgressSeconds);
+
+  // Reset restriction state on video change
+  useEffect(() => {
+    setIsRestricted(false);
+  }, [videoId]);
 
   // Build privacy-enhanced YouTube embed URL with JS API enabled
   const embedUrl = new URL(
@@ -94,6 +100,11 @@ export function EmbedPlayer({
             if (onEnded) onEnded();
             else if (onNextVideo) onNextVideo();
           }
+        } else if (data.event === "onError") {
+          // 101 or 150: video owner disabled embedding
+          if (data.info === 101 || data.info === 150 || data.info === 100) {
+            setIsRestricted(true);
+          }
         }
       } catch (_) {
         // Ignore unparseable postMessages
@@ -106,6 +117,27 @@ export function EmbedPlayer({
 
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-xl">
+      {/* Restricted Video Overlay */}
+      {isRestricted && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center text-white">
+          <h3 className="text-base sm:text-lg font-bold mb-2">
+            Playback Restricted by Creator
+          </h3>
+          <p className="max-w-md text-xs text-zinc-400 mb-5 leading-relaxed">
+            The owner of this video does not allow playback on third-party websites. You can watch it directly on YouTube.
+          </p>
+          <a
+            href={`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-xs font-semibold text-white transition-colors shadow-lg"
+          >
+            <span>Watch on YouTube</span>
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        </div>
+      )}
+
       {/* Provider Switch Button */}
       {onSwitchToHtml5 && (
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
