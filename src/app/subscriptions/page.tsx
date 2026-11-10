@@ -14,10 +14,16 @@ export default function SubscriptionsPage() {
   const { data: session } = useSession();
   const [channels, setChannels] = useState<YouTubeChannel[]>([]);
   const [feedVideos, setFeedVideos] = useState<YouTubeVideo[]>([]);
+  const [authConfigured, setAuthConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
+
+    fetch("/api/auth/status")
+      .then((r) => r.json())
+      .then((data) => setAuthConfigured(Boolean(data.configured)))
+      .catch(() => {});
 
     Promise.all([
       fetch("/api/youtube/subscriptions").then((r) => r.json()),
@@ -51,15 +57,24 @@ export default function SubscriptionsPage() {
               </p>
             </div>
           </div>
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => signIn("google")}
-            className="gap-1.5 text-xs font-semibold shrink-0"
-          >
-            <LogIn className="h-3.5 w-3.5" />
-            <span>Sign in with Google</span>
-          </Button>
+          {authConfigured ? (
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => signIn("google")}
+              className="gap-1.5 text-xs font-semibold shrink-0"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              <span>Sign in with Google</span>
+            </Button>
+          ) : (
+            <Link
+              href="/settings"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-xs font-medium hover:bg-secondary/80 text-foreground shrink-0 border border-border"
+            >
+              <span>Setup Google OAuth in Settings</span>
+            </Link>
+          )}
         </div>
       )}
 

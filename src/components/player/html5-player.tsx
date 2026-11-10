@@ -1,9 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import { usePlayer } from "./player-context";
-import { PlayerControls } from "./player-controls";
-import { Play, Pause, AlertCircle, RefreshCw, FastForward, Rewind } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import { AlertCircle, Film, RefreshCw, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface HTML5PlayerProps {
@@ -13,7 +11,7 @@ interface HTML5PlayerProps {
   thumbnailUrl?: string;
   initialProgressSeconds?: number;
   onEnded?: () => void;
-  onNextVideo?: () => void;
+  onSwitchToEmbed?: () => void;
 }
 
 export function HTML5Player({
@@ -23,39 +21,20 @@ export function HTML5Player({
   thumbnailUrl,
   initialProgressSeconds = 0,
   onEnded,
-  onNextVideo,
+  onSwitchToEmbed,
 }: HTML5PlayerProps) {
-  const {
-    isPlaying,
-    currentTime,
-    duration,
-    showCaptions,
-    togglePlay,
-    seek,
-    toggleFullscreen,
-    setActiveProvider,
-    registerVideoElement,
-    registerContainerElement,
-  } = usePlayer();
-
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isBuffering, setIsBuffering] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
-  const [showCenterIcon, setShowCenterIcon] = useState(false);
-  const [seekAnimation, setSeekAnimation] = useState<"+10s" | "-10s" | null>(null);
-  const [controlsVisible, setControlsVisible] = useState(true);
-
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastTapRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
+  const lastRecordedTimeRef = useRef<number>(0);
 
-  // Fetch direct stream URL with smart auto-switch for cipher-protected videos
+  // Load stream URL
   useEffect(() => {
     let isCancelled = false;
     setLoading(true);
     setStreamError(null);
+    setStreamUrl(null);
 
     fetch(`/api/stream?id=${encodeURIComponent(videoId)}`)
       .then((res) => res.json())
@@ -64,8 +43,10 @@ export function HTML5Player({
         if (data.hasDirectStream && data.streamUrl) {
           setStreamUrl(data.streamUrl);
         } else {
-          // Direct stream cipher protected: auto-switch to embed player for guaranteed playback
-          setActiveProvider("embed");
+          setStreamError(
+            data.message ||
+              "YouTube signature cipher prevents direct HTML5 <video> streaming for this video."
+          );
         }
       })
       .catch((err) => {
@@ -79,212 +60,112 @@ export function HTML5Player({
     return () => {
       isCancelled = true;
     };
-  }, [videoId, setActiveProvider]);
+  }, [videoId]);
 
-  // Register container and video refs
+  // Set initial progress timestamp if resuming
   useEffect(() => {
-    registerContainerElement(containerRef.current);
-  }, [registerContainerElement]);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      registerVideoElement(videoRef.current);
-      if (initialProgressSeconds > 0) {
-        videoRef.current.currentTime = initialProgressSeconds;
-      }
+    if (videoRef.current && initialProgressSeconds > 0) {
+      videoRef.current.currentTime = initialProgressSeconds;
     }
-  }, [streamUrl, initialProgressSeconds, registerVideoElement]);
+  }, [streamUrl, initialProgressSeconds]);
 
-  // Handle controls auto-hide during playback
-  const showControlsTemporarily = useCallback(() => {
-    setControlsVisible(true);
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+  // Sync watch progress to history every 5 seconds
+  const handleTimeUpdate = () => {
+    const video = videoRef.current;
+    if (!video) return;
 
-    if (isPlaying) {
-      controlsTimeoutRef.current = setTimeout(() => {
-        setControlsVisible(false);
-      }, 3500);
-    }
-  }, [isPlaying]);
-
-  const handleMouseMove = () => {
-    showControlsTemporarily();
-  };
-
-  const handleMouseLeave = () => {
-    if (isPlaying) {
-      setControlsVisible(false);
+    const curr = Math.floor(video.currentTime);
+    if (curr > 0 && Math.abs(curr - lastRecordedTimeRef.current) >= 5) {
+      lastRecordedTimeRef.current = curr;
+      fetch("/api/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoId,
+          title: title || "YouTube Video",
+          channelTitle: channelTitle || "Creator",
+          progressSeconds: curr,
+          totalSeconds: Math.floor(video.duration || 0),
+        }),
+      }).catch(() => {});
     }
   };
 
-  // Video click/tap handling with double-tap seek detection
-  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // If clicking on controls, don't toggle play
-    const target = e.target as HTMLElement;
-    if (target.closest("[data-controls]")) return;
+  if (loading) {
+    return (
+      <div className="flex aspect-video w-full flex-col items-center justify-center rounded-2xl bg-black text-white gap-3 shadow-lg">
+        <RefreshCw className="h-8 w-8 animate-spin text-red-500" />
+        <span className="text-xs text-muted-foreground">
+          Resolving video stream for native player...
+        </span>
+      </div>
+    );
+  }
 
-    const now = Date.now();
-    const rect = containerRef.current?.getBoundingClientRect();
-    const clickX = e.clientX;
-
-    if (now - lastTapRef.current.time < 300 && rect) {
-      // Double click detected!
-      const isRightSide = clickX - rect.left > rect.width / 2;
-      if (isRightSide) {
-        seek(Math.min(duration, currentTime + 10));
-        setSeekAnimation("+10s");
-      } else {
-        seek(Math.max(0, currentTime - 10));
-        setSeekAnimation("-10s");
-      }
-      setTimeout(() => setSeekAnimation(null), 600);
-      lastTapRef.current = { time: 0, x: 0 };
-      return;
-    }
-
-    lastTapRef.current = { time: now, x: clickX };
-
-    // Single click toggles play/pause
-    togglePlay();
-    setShowCenterIcon(true);
-    showControlsTemporarily();
-    setTimeout(() => setShowCenterIcon(false), 500);
-  };
-
-  // Double click on desktop toggles fullscreen
-  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.closest("[data-controls]")) return;
-    toggleFullscreen();
-  };
-
-  // Touch handling for mobile/tablet screens
-  const handleTouchStart = () => {
-    showControlsTemporarily();
-  };
-
-  // Listen to buffering events
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-
-    const onWaiting = () => setIsBuffering(true);
-    const onPlaying = () => setIsBuffering(false);
-    const onCanPlay = () => setIsBuffering(false);
-
-    v.addEventListener("waiting", onWaiting);
-    v.addEventListener("playing", onPlaying);
-    v.addEventListener("canplay", onCanPlay);
-
-    return () => {
-      v.removeEventListener("waiting", onWaiting);
-      v.removeEventListener("playing", onPlaying);
-      v.removeEventListener("canplay", onCanPlay);
-    };
-  }, [streamUrl]);
-
-  return (
-    <div
-      ref={containerRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onClick={handleContainerClick}
-      onDoubleClick={handleDoubleClick}
-      onTouchStart={handleTouchStart}
-      className="group relative flex aspect-video w-full overflow-hidden rounded-2xl bg-black select-none shadow-xl"
-    >
-      {/* Direct Video Element */}
-      {streamUrl && (
-        <video
-          ref={videoRef}
-          src={streamUrl}
-          poster={thumbnailUrl}
-          onEnded={onEnded}
-          playsInline
-          className="h-full w-full object-contain cursor-pointer"
-        />
-      )}
-
-      {/* Double-tap Seek Animation Overlays */}
-      {seekAnimation === "+10s" && (
-        <div className="pointer-events-none absolute right-12 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center justify-center rounded-full bg-black/60 p-4 text-white animate-pulse">
-          <FastForward className="h-8 w-8 fill-current" />
-          <span className="text-xs font-bold mt-1">+10s</span>
-        </div>
-      )}
-      {seekAnimation === "-10s" && (
-        <div className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center justify-center rounded-full bg-black/60 p-4 text-white animate-pulse">
-          <Rewind className="h-8 w-8 fill-current" />
-          <span className="text-xs font-bold mt-1">-10s</span>
-        </div>
-      )}
-
-      {/* Center Play/Pause Indicator Animation */}
-      {showCenterIcon && (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
-          <div className="flex h-16 w-16 animate-ping items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-xs">
-            {isPlaying ? (
-              <Pause className="h-8 w-8 fill-current" />
-            ) : (
-              <Play className="h-8 w-8 fill-current" />
+  // If YouTube cipher protection prevents native <video> streaming
+  if (!streamUrl || streamError) {
+    return (
+      <div className="relative flex aspect-video w-full flex-col items-center justify-center rounded-2xl bg-zinc-950 border border-zinc-800 p-6 text-center text-white shadow-xl overflow-hidden">
+        {thumbnailUrl && (
+          <img
+            src={thumbnailUrl}
+            alt={title || "Video thumbnail"}
+            className="absolute inset-0 h-full w-full object-cover opacity-20 filter blur-xs"
+          />
+        )}
+        <div className="relative z-10 flex flex-col items-center max-w-md">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 mb-3">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <h3 className="text-base sm:text-lg font-bold mb-1.5">
+            Cipher-Protected YouTube Stream
+          </h3>
+          <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
+            YouTube restricts raw MP4/WebM streaming for this video using signature ciphers. The browser&apos;s native <code className="text-zinc-200">&lt;video&gt;</code> player cannot decrypt googlevideo streams without YouTube&apos;s player.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {onSwitchToEmbed && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onSwitchToEmbed}
+                className="gap-2 bg-red-600 hover:bg-red-700 text-white font-medium text-xs"
+              >
+                <Film className="h-4 w-4" />
+                <span>Play in Official YouTube Player</span>
+              </Button>
             )}
+            <a
+              href={`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700 hover:bg-zinc-800 text-xs text-zinc-300 font-medium transition-colors"
+            >
+              <span>Open on YouTube</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Loading & Buffering Spinner */}
-      {(loading || isBuffering) && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 gap-3">
-          <RefreshCw className="h-9 w-9 animate-spin text-[#FF0000]" />
-          <span className="text-xs font-medium text-white/90">
-            {loading ? "Resolving video stream..." : "Buffering..."}
-          </span>
-        </div>
-      )}
-
-      {/* Fallback Error / Switcher Notice */}
-      {!loading && streamError && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gradient-to-t from-black via-zinc-900 to-black p-6 text-center">
-          <AlertCircle className="h-10 w-10 text-amber-400 mb-3" />
-          <h3 className="text-base sm:text-lg font-bold text-white mb-2">
-            Protected Media Stream
-          </h3>
-          <p className="max-w-md text-xs text-white/70 mb-5 leading-relaxed">
-            Direct MP4 stream is cipher-protected for this video. Switch to the Official YouTube Player for guaranteed, high-definition playback.
-          </p>
-          <Button
-            variant="youtube"
-            size="default"
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveProvider("embed");
-            }}
-            className="gap-2 font-medium"
-          >
-            Switch to Official Player
-          </Button>
-        </div>
-      )}
-
-      {/* Closed Captions Overlay */}
-      {showCaptions && isPlaying && (
-        <div className="pointer-events-none absolute bottom-14 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-md bg-black/85 text-white font-medium text-xs sm:text-sm tracking-wide text-center max-w-xl shadow">
-          [Audio: {title || "YouTube Stream"}]
-        </div>
-      )}
-
-      {/* Player Controls Overlay */}
-      {streamUrl && (
-        <div
-          data-controls="true"
-          onClick={(e) => e.stopPropagation()}
-          className={`transition-opacity duration-300 ${
-            controlsVisible || !isPlaying ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          <PlayerControls onNextVideo={onNextVideo} />
-        </div>
-      )}
+  // Native HTML5 <video controls> Player - Default appearance and behavior
+  return (
+    <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-xl">
+      <video
+        ref={videoRef}
+        src={streamUrl}
+        poster={thumbnailUrl}
+        controls
+        autoPlay
+        playsInline
+        onEnded={onEnded}
+        onTimeUpdate={handleTimeUpdate}
+        className="h-full w-full object-contain"
+      >
+        Your browser does not support the video tag.
+      </video>
     </div>
   );
 }

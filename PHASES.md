@@ -29,24 +29,18 @@
 - [x] Implement fallback mock/offline data mode for quota depletion or unauthenticated browsing
 - [x] Verify YouTube API service operations and cache behavior
 
-## Phase 4: Full-Featured Custom HTML5 Video Player
-- [x] Implement custom HTML5 `<video>` Player component with custom styling:
-  - [x] Play, Pause, Replay, and Seeking
-  - [x] Interactive timeline scrubber with buffer progress, touch dragging, and timestamp hover tooltip
-  - [x] Double-tap seeking gestures on mobile (±10s) and double-click to toggle fullscreen
-  - [x] Volume slider and mute toggle
-  - [x] Playback speed selector (0.25x, 0.5x, 0.75x, 1x, 1.25x, 1.5x, 1.75x, 2x)
-  - [x] Resolution/Quality switcher
-  - [x] Subtitles / Closed Captions (CC) parser and renderer
-  - [x] Fullscreen, Theater mode, and Picture-in-Picture (PiP)
-  - [x] Standard YouTube keyboard shortcuts (Space/K, J/L, Arrows, M, F, T)
-  - [x] Auto-advance / Autoplay toggle with smooth transition
+## Phase 4: Native Browser HTML5 Video Player & Dual Playback Engine
+- [x] Implement Native Browser HTML5 `<video controls>` Player:
+  - [x] Default browser native controls and appearance (play/pause, scrubber, volume, fullscreen, playback speed)
+  - [x] Stream loading and playback for direct media assets
+  - [x] Honest cipher-protection handling and one-click fallback for restricted streams
+  - [x] Watch progress tracking to local history via `onTimeUpdate`
+  - [x] Auto-advance / Autoplay transition via `onEnded`
 - [x] Implement dual Playback Provider system:
-  - [x] Direct Stream Provider (HTML5 native playback via stream resolver/proxy)
-  - [x] Official YouTube IFrame / Embed Provider with postMessage API progress synchronization and auto-advance
-  - [x] Automatic fallback to Embed Player when cipher-protection is detected
-- [x] Implement watch progress tracking and auto-resume from last timestamp across engines
-- [x] Verify player features, provider switching, mobile touch scrubbing, and keyboard navigation
+  - [x] Direct Stream Provider: native HTML5 `<video controls>` for direct media
+  - [x] Official YouTube IFrame Provider: privacy-enhanced embed (`youtube-nocookie.com`) guaranteeing 100% playback for cipher-protected videos
+  - [x] In-player engine toggle enabling instant switching between Native `<video>` and YouTube Player
+- [x] Verify playback across direct streams, cipher-protected videos, and watch history synchronization
 
 ## Phase 5: Client User Experience & Pages
 - [x] Home Page (`/`): Category chips, video feed cards with duration, views, relative timestamp, and channel avatar

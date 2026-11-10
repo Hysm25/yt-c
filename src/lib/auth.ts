@@ -11,6 +11,15 @@ declare module "next-auth" {
   }
 }
 
+const GOOGLE_CLIENT_ID =
+  process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID || "";
+const GOOGLE_CLIENT_SECRET =
+  process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET || "";
+
+export const isGoogleAuthConfigured = Boolean(
+  GOOGLE_CLIENT_ID.trim() && GOOGLE_CLIENT_SECRET.trim()
+);
+
 const GOOGLE_AUTH_SCOPES = [
   "openid",
   "email",
@@ -21,13 +30,17 @@ const GOOGLE_AUTH_SCOPES = [
 
 async function refreshAccessToken(token: Record<string, any>) {
   try {
+    if (!isGoogleAuthConfigured) {
+      throw new Error("Google OAuth credentials are not configured.");
+    }
+
     const url = "https://oauth2.googleapis.com/token";
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: process.env.AUTH_GOOGLE_ID || "",
-        client_secret: process.env.AUTH_GOOGLE_SECRET || "",
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
         grant_type: "refresh_token",
         refresh_token: token.refreshToken as string,
       }),
@@ -56,20 +69,22 @@ async function refreshAccessToken(token: Record<string, any>) {
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
-  providers: [
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID || "",
-      clientSecret: process.env.AUTH_GOOGLE_SECRET || "",
-      authorization: {
-        params: {
-          scope: GOOGLE_AUTH_SCOPES,
-          access_type: "offline",
-          prompt: "consent",
-          response_type: "code",
-        },
-      },
-    }),
-  ],
+  providers: isGoogleAuthConfigured
+    ? [
+        Google({
+          clientId: GOOGLE_CLIENT_ID,
+          clientSecret: GOOGLE_CLIENT_SECRET,
+          authorization: {
+            params: {
+              scope: GOOGLE_AUTH_SCOPES,
+              access_type: "offline",
+              prompt: "consent",
+              response_type: "code",
+            },
+          },
+        }),
+      ]
+    : [],
   callbacks: {
     async jwt({ token, account, user }) {
       // Initial sign-in

@@ -1,20 +1,23 @@
 import { IYouTubeDataProvider } from "./provider-interface";
 import { OfficialYouTubeApiProvider } from "./official-api-provider";
+import { PublicYouTubeDataProvider } from "./public-youtube-provider";
 import { MockYouTubeDataProvider } from "./mock-provider";
 import { apiCache } from "./cache";
 
 class YouTubeService {
   private primaryProvider: IYouTubeDataProvider;
-  private fallbackProvider: MockYouTubeDataProvider;
+  private publicProvider: PublicYouTubeDataProvider;
+  private mockProvider: MockYouTubeDataProvider;
 
   constructor() {
     const apiKey = process.env.YOUTUBE_API_KEY;
-    this.fallbackProvider = new MockYouTubeDataProvider();
+    this.publicProvider = new PublicYouTubeDataProvider();
+    this.mockProvider = new MockYouTubeDataProvider();
 
     if (apiKey && apiKey.trim() !== "") {
       this.primaryProvider = new OfficialYouTubeApiProvider(apiKey.trim());
     } else {
-      this.primaryProvider = this.fallbackProvider;
+      this.primaryProvider = this.publicProvider;
     }
   }
 
@@ -29,14 +32,44 @@ class YouTubeService {
 
     try {
       const data = await operation(this.primaryProvider);
-      apiCache.set(cacheKey, data, ttlSeconds);
+      const hasContent = (obj: any) => {
+        if (!obj || typeof obj !== "object") return true;
+        if ("videos" in obj) return (obj as any).videos?.length > 0;
+        if ("items" in obj) return (obj as any).items?.length > 0;
+        return true;
+      };
+
+      if (data && hasContent(data)) {
+        apiCache.set(cacheKey, data, ttlSeconds);
+        return data;
+      }
+      if (this.primaryProvider !== this.publicProvider) {
+        // If official returned empty or failed, try public provider
+        const publicData = await operation(this.publicProvider);
+        if (publicData && hasContent(publicData)) {
+          apiCache.set(cacheKey, publicData, ttlSeconds);
+          return publicData;
+        }
+      }
       return data;
     } catch (err: any) {
       console.warn(
-        `YouTube API primary provider failed (${err.message}). Using fallback provider.`
+        `YouTube API provider failed (${err.message}). Trying public/fallback provider.`
       );
-      // Fallback to mock provider
-      const fallbackData = await operation(this.fallbackProvider);
+
+      // If primary wasn't public provider, try public provider first
+      if (this.primaryProvider !== this.publicProvider) {
+        try {
+          const publicData = await operation(this.publicProvider);
+          apiCache.set(cacheKey, publicData, ttlSeconds);
+          return publicData;
+        } catch (pubErr: any) {
+          console.warn("Public YouTube provider failed:", pubErr.message);
+        }
+      }
+
+      // Final fallback to mock provider (offline resilience)
+      const fallbackData = await operation(this.mockProvider);
       return fallbackData;
     }
   }
@@ -97,7 +130,7 @@ class YouTubeService {
         console.warn("Failed to fetch user subscriptions with token, falling back.");
       }
     }
-    return await this.fallbackProvider.getUserSubscriptions();
+    return await this.mockProvider.getUserSubscriptions();
   }
 
   async getUserPlaylists(accessToken?: string, pageToken?: string) {
@@ -109,7 +142,7 @@ class YouTubeService {
         console.warn("Failed to fetch user playlists with token, falling back.");
       }
     }
-    return await this.fallbackProvider.getUserPlaylists();
+    return await this.mockProvider.getUserPlaylists();
   }
 }
 

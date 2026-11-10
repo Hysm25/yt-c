@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Film, AlertCircle } from "lucide-react";
-import { usePlayer } from "./player-context";
+import { Film, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface EmbedPlayerProps {
@@ -13,6 +12,7 @@ interface EmbedPlayerProps {
   initialProgressSeconds?: number;
   onEnded?: () => void;
   onNextVideo?: () => void;
+  onSwitchToHtml5?: () => void;
 }
 
 export function EmbedPlayer({
@@ -23,14 +23,13 @@ export function EmbedPlayer({
   initialProgressSeconds = 0,
   onEnded,
   onNextVideo,
+  onSwitchToHtml5,
 }: EmbedPlayerProps) {
-  const { setActiveProvider, currentTime: contextTime } = usePlayer();
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const lastRecordedTimeRef = useRef<number>(0);
 
-  // Resume from contextTime if available, else initialProgressSeconds
-  const startTime = Math.floor(contextTime > 0 ? contextTime : initialProgressSeconds);
+  const startTime = Math.floor(initialProgressSeconds);
 
   // Build privacy-enhanced YouTube embed URL with JS API enabled
   const embedUrl = new URL(
@@ -41,7 +40,10 @@ export function EmbedPlayer({
   embedUrl.searchParams.set("modestbranding", "1");
   embedUrl.searchParams.set("playsinline", "1");
   embedUrl.searchParams.set("enablejsapi", "1");
-  embedUrl.searchParams.set("origin", typeof window !== "undefined" ? window.location.origin : "");
+  embedUrl.searchParams.set(
+    "origin",
+    typeof window !== "undefined" ? window.location.origin : ""
+  );
   if (startTime > 0) {
     embedUrl.searchParams.set("start", startTime.toString());
   }
@@ -49,13 +51,16 @@ export function EmbedPlayer({
   // Listen for YouTube IFrame postMessage events to track watch progress and video completion
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Validate origin if possible
-      if (!event.origin.includes("youtube.com") && !event.origin.includes("youtube-nocookie.com")) {
+      if (
+        !event.origin.includes("youtube.com") &&
+        !event.origin.includes("youtube-nocookie.com")
+      ) {
         return;
       }
 
       try {
-        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        const data =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (!data) return;
 
         // infoDelivery event contains real-time currentTime and playerState
@@ -69,7 +74,6 @@ export function EmbedPlayer({
           }
 
           if (typeof currentTime === "number" && currentTime > 0) {
-            // Record progress every 5 seconds
             if (Math.abs(currentTime - lastRecordedTimeRef.current) >= 5) {
               lastRecordedTimeRef.current = currentTime;
               fetch("/api/history", {
@@ -86,7 +90,6 @@ export function EmbedPlayer({
             }
           }
         } else if (data.event === "onStateChange") {
-          // 0 is ended in standard API
           if (data.info === 0) {
             if (onEnded) onEnded();
             else if (onNextVideo) onNextVideo();
@@ -102,21 +105,23 @@ export function EmbedPlayer({
   }, [videoId, title, channelTitle, onEnded, onNextVideo]);
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-lg">
-      {/* Switcher Badge Overlay */}
-      <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setActiveProvider("html5")}
-          title="Switch to Native HTML5 Video Player"
-          className="bg-black/70 hover:bg-black/90 text-white text-xs border border-white/20 backdrop-blur-md gap-1.5 shadow"
-        >
-          <Film className="h-3.5 w-3.5 text-red-400" />
-          <span className="hidden sm:inline">Switch to HTML5</span>
-          <span className="sm:hidden">HTML5</span>
-        </Button>
-      </div>
+    <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-xl">
+      {/* Provider Switch Button */}
+      {onSwitchToHtml5 && (
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onSwitchToHtml5}
+            title="Switch to Browser Native HTML5 Player"
+            className="bg-black/75 hover:bg-black/90 text-white text-xs border border-white/20 backdrop-blur-md gap-1.5 shadow"
+          >
+            <Film className="h-3.5 w-3.5 text-red-400" />
+            <span className="hidden sm:inline">Native HTML5 Player</span>
+            <span className="sm:hidden">HTML5</span>
+          </Button>
+        </div>
+      )}
 
       {/* Official YouTube Embed IFrame */}
       <iframe

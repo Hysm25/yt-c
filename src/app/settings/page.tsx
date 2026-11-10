@@ -21,17 +21,30 @@ import { Avatar } from "@/components/ui/avatar";
 import { useTheme } from "@/components/providers/theme-provider";
 
 export default function SettingsPage() {
-  const { data: session, status: authStatus } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const { theme, setTheme } = useTheme();
 
-  const [provider, setProvider] = useState<"html5" | "embed">("html5");
+  const [provider, setProvider] = useState<"html5" | "embed">("embed");
   const [apiKey, setApiKey] = useState("");
   const [autoplay, setAutoplay] = useState(true);
   const [quality, setQuality] = useState("auto");
+  const [authStatus, setAuthStatus] = useState<{ configured: boolean; missing?: string[] }>({
+    configured: false,
+  });
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    fetch("/api/auth/status")
+      .then((res) => res.json())
+      .then((data) => {
+        setAuthStatus({
+          configured: Boolean(data.configured),
+          missing: data.missing || [],
+        });
+      })
+      .catch(() => {});
+
     fetch("/api/settings")
       .then((res) => res.json())
       .then((data) => {
@@ -162,26 +175,51 @@ export default function SettingsPage() {
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-1">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-semibold text-foreground">
-                Guest Mode (Local Persistence)
-              </span>
-              <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
-                You are currently browsing as a Guest. Your watch history, playlists, and liked videos are saved to your local PostgreSQL database. Connect your Google account to sync live YouTube subscriptions and playlists.
-              </p>
+          <div className="flex flex-col gap-3 pt-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-foreground">
+                  Guest Mode (Local Persistence)
+                </span>
+                <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
+                  You are currently browsing as a Guest. Your watch history, playlists, and liked videos are saved to your local PostgreSQL database. Connect your Google account to sync live YouTube subscriptions and playlists.
+                </p>
+              </div>
+
+              {authStatus.configured ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={() => signIn("google")}
+                  className="gap-2 text-xs font-semibold shrink-0"
+                >
+                  <LogIn className="h-3.5 w-3.5" />
+                  <span>Sign in with Google</span>
+                </Button>
+              ) : null}
             </div>
 
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={() => signIn("google")}
-              className="gap-2 text-xs font-semibold shrink-0"
-            >
-              <LogIn className="h-3.5 w-3.5" />
-              <span>Sign in with Google</span>
-            </Button>
+            {!authStatus.configured && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+                <div className="flex items-center gap-1.5 font-semibold text-amber-500 pb-1">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>Google OAuth Configuration Guide</span>
+                </div>
+                <p className="text-muted-foreground text-[11px] leading-relaxed pb-2">
+                  To enable Google Sign-In, create an OAuth 2.0 Web Client in Google Cloud Console and set the following in your <code className="text-foreground font-mono">.env.local</code> file:
+                </p>
+                <pre className="rounded bg-black/40 p-2 font-mono text-[10px] text-zinc-300 overflow-x-auto space-y-0.5">
+                  <div>AUTH_GOOGLE_ID=your_client_id_here.apps.googleusercontent.com</div>
+                  <div>AUTH_GOOGLE_SECRET=GOCSPX-your_client_secret_here</div>
+                  <div>NEXTAUTH_URL=http://localhost:3000</div>
+                </pre>
+                <div className="pt-2 text-[10px] text-muted-foreground">
+                  Authorized Redirect URI required in Google Cloud Console:{" "}
+                  <code className="text-foreground font-mono select-all">http://localhost:3000/api/auth/callback/google</code>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

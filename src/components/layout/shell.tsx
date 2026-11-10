@@ -19,7 +19,7 @@ export function Shell({ children }: ShellProps) {
   // In watch page, default to collapsed sidebar for theater immersion
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isWatchPage);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
-  const [playbackProvider, setPlaybackProvider] = useState<"html5" | "embed">("html5");
+  const [playbackProvider, setPlaybackProvider] = useState<"html5" | "embed">("embed");
 
   // Close mobile drawer on route navigation
   useEffect(() => {
